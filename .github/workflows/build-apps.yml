@@ -1,0 +1,51 @@
+name: build-apps
+# Builds the desktop application for Windows and macOS.
+# Runs when a version tag (for example v1.0.0) is pushed, or manually from the Actions tab.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install . pyinstaller
+      - name: Build TeleEP.exe
+        run: pyinstaller --noconfirm --onefile --windowed --name TeleEP --collect-data teleep --collect-submodules teleep packaging/teleep_app.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TeleEP-Windows
+          path: dist/TeleEP.exe
+      - if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/TeleEP.exe
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install . pyinstaller
+      - name: Build TeleEP.app
+        run: pyinstaller --noconfirm --windowed --name TeleEP --collect-data teleep --collect-submodules teleep packaging/teleep_app.py
+      - name: Package the disk image
+        run: hdiutil create -volname TeleEP -srcfolder dist/TeleEP.app -ov -format UDZO TeleEP-macOS.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TeleEP-macOS
+          path: TeleEP-macOS.dmg
+      - if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: TeleEP-macOS.dmg

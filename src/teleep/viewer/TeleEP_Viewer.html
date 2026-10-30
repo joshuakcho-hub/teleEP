@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TeleEP Viewer</title>
+<style>
+:root{
+  --bg:#f4f4f2; --panel:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --line:#dcdbd6;
+  --grid:#ecebe7; --trace:#1f2328; --r:#2a78d6; --p:#eb6834; --bad:rgba(120,118,110,.16);
+  --sel:rgba(42,120,214,.12); --win:rgba(42,120,214,.10); --accent:#2a78d6; --warn:#b4541a;
+  --btn:#ffffff; --btnh:#f0efec; --ok:#1b7f3b;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121211; --panel:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#8f8e86; --line:#33332f;
+    --grid:#262624; --trace:#e8e7e2; --r:#3987e5; --p:#d95926; --bad:rgba(200,198,190,.14);
+    --sel:rgba(57,135,229,.18); --win:rgba(57,135,229,.16); --accent:#3987e5; --btn:#232321; --btnh:#2c2c2a; --ok:#3aa45c;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121211; --panel:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#8f8e86; --line:#33332f;
+  --grid:#262624; --trace:#e8e7e2; --r:#3987e5; --p:#d95926; --bad:rgba(200,198,190,.14);
+  --sel:rgba(57,135,229,.18); --win:rgba(57,135,229,.16); --accent:#3987e5; --btn:#232321; --btnh:#2c2c2a; --ok:#3aa45c;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:13px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+#app{display:flex;flex-direction:column;height:100%}
+.bar{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:6px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+.g{display:flex;gap:5px;align-items:center}
+.g>label,.lab{color:var(--ink2)}
+.title{font-weight:600;letter-spacing:.2px}
+button,select,input[type=number],input[type=text]{background:var(--btn);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font:inherit}
+button{cursor:pointer} button:hover{background:var(--btnh)} button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+input[type=number]{width:62px}
+.file{position:relative;overflow:hidden}
+.file input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.sep{width:1px;height:22px;background:var(--line)}
+#main{flex:1;display:flex;flex-direction:column;min-height:0}
+#wrap{flex:1;position:relative;min-height:160px}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
+#lower{display:flex;height:230px;border-top:1px solid var(--line);background:var(--panel)}
+#tachoWrap{flex:1;position:relative;min-width:0}
+#tacho{position:absolute;inset:0;width:100%;height:100%;cursor:pointer}
+#hrv{width:390px;border-left:1px solid var(--line);overflow:auto;padding:8px 10px}
+#hrv h3{margin:0 0 4px;font-size:13px;font-weight:600}
+#hrv .sub{color:var(--ink2);font-size:12px;margin-bottom:6px}
+#hrv table{border-collapse:collapse;width:100%;font-size:12px;font-variant-numeric:tabular-nums}
+#hrv td,#hrv th{padding:2px 4px;border-bottom:1px solid var(--grid);text-align:right}
+#hrv th{color:var(--ink2);font-weight:500}
+#hrv td:first-child,#hrv th:first-child{text-align:left;color:var(--ink2)}
+#hrv tr.grp td{padding-top:7px;color:var(--ink);font-weight:600;text-align:left;border-bottom:none}
+#status{display:flex;gap:16px;flex-wrap:wrap;padding:5px 12px;background:var(--panel);border-top:1px solid var(--line);color:var(--ink2);min-height:28px}
+#status b{color:var(--ink);font-weight:600}
+.pill{border:1px solid var(--line);border-radius:20px;padding:1px 9px}
+.leg{display:inline-flex;gap:12px;align-items:center}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+#menu{position:absolute;display:none;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.15);z-index:20;min-width:240px;padding:4px}
+#menu button{border:none;text-align:left;border-radius:4px;background:transparent}
+#menu button:hover{background:var(--btnh)}
+#help{position:absolute;right:12px;top:12px;max-width:440px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px;display:none;z-index:15;box-shadow:0 6px 24px rgba(0,0,0,.12)}
+#help.show{display:block} #help h4{margin:6px 0 4px} #help p{margin:4px 0}
+kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;font-size:11px}
+#busy{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);background:var(--panel);border:1px solid var(--line);padding:10px 16px;border-radius:8px;display:none;z-index:30}
+.leadbox{display:inline-flex;gap:4px;align-items:center;margin-right:4px}
+</style>
+</head>
+<body>
+<div id="app">
+ <div class="bar">
+  <span class="title">TeleEP Viewer</span>
+  <div class="g"><button class="file primary">Open EDF<input type="file" id="fEdf" accept=".edf,.EDF"></button>
+   <button class="file">Import marks<input type="file" id="fMarks" accept=".json"></button></div>
+  <span id="fileInfo" class="lab">No file loaded</span>
+  <div class="g" style="margin-left:auto"><button id="bHelp" title="Keyboard and mouse help">Help</button>
+   <button id="bTheme" title="Light / dark">Theme</button></div>
+ </div>
+ <div class="bar">
+  <div class="g"><label>Window</label><select id="win"><option>2</option><option>5</option><option selected>10</option><option>20</option><option>30</option><option>60</option><option>120</option><option>300</option><option>600</option><option>1800</option><option>3600</option></select><span class="lab">s</span></div>
+  <div class="g"><button id="bBack" title="Back (left arrow)">&#9664;</button><button id="bFwd" title="Forward (right arrow)">&#9654;</button>
+   <input type="text" id="goto" placeholder="go to hh:mm:ss" style="width:110px"></div>
+  <div class="sep"></div>
+  <div class="g"><label>Filter</label><label><input type="checkbox" id="fOn" checked> on</label>
+   <label>HP</label><input type="number" id="hp" value="0.5" step="0.1" min="0">
+   <label>LP</label><input type="number" id="lp" value="40" step="1" min="0">
+   <label>Notch</label><select id="notch"><option value="0">off</option><option>50</option><option>60</option></select>
+   <label title="Running-median baseline removal (display only)"><input type="checkbox" id="base"> baseline</label></div>
+  <div class="sep"></div>
+  <div class="g"><label>Gain</label><button id="gDn">&minus;</button><button id="gUp">+</button><button id="gAuto" class="on">auto</button></div>
+  <div class="g" id="leadBoxes"></div>
+ </div>
+ <div class="bar">
+  <div class="g"><label>Species</label><select id="species"><option value="pig" selected>pig</option><option value="dog">dog</option><option value="human">human</option><option value="rat">rat</option><option value="mouse">mouse</option></select></div>
+  <div class="g"><label>Detect on</label><select id="detLead"></select><button id="bDetect" class="primary" title="Detect R peaks in the whole file">Detect R peaks</button></div>
+  <div class="g"><label>Edit</label><button id="mAdd" title="Add a beat: A, then click">Add</button><button id="mDel" title="Delete a beat: D, then click (or right-click)">Delete</button>
+   <select id="editWhat" title="Which marks to edit"><option value="R">R (QRS)</option><option value="P">P</option></select><button id="bUndo" title="Undo (Ctrl+Z)">Undo</button></div>
+  <div class="g"><button id="bCal" title="Caliper: C">Caliper</button></div>
+  <div class="sep"></div>
+  <div class="g"><label>Artifact</label><input type="number" id="art" value="20" step="5" min="0" title="Intervals that differ from their neighbours by more than this percentage are excluded from HRV (0 = off)"><span class="lab">%</span>
+   <label>Epoch</label><input type="number" id="epochMin" value="5" step="1" min="1"><span class="lab">min</span></div>
+  <div class="g" style="margin-left:auto"><button id="bExport">Export &#9662;</button></div>
+ </div>
+ <div id="main">
+  <div id="wrap"><canvas id="cv"></canvas><div id="help">
+   <h4>Navigate</h4>
+   <p><kbd>&larr;</kbd> <kbd>&rarr;</kbd> half window, <kbd>Shift</kbd>+arrows full window, <kbd>+</kbd> <kbd>&minus;</kbd> zoom, drag on the trace to zoom into a range. Click the tachogram (bottom) to jump; drag on it to select a range for HRV; double-click it to clear the selection.</p>
+   <h4>Analyze</h4>
+   <p><b>Detect R peaks</b> runs the generic detector on the whole file. For pigs with atrioventricular block, run <code>teleep analyze</code> (multi-lead P/QRS detector) and use <b>Import marks</b> to load its <code>viewer_marks/&lt;file&gt;.marks.json</code>; the R and P marks can then be reviewed and corrected here.</p>
+   <h4>Edit</h4>
+   <p><kbd>A</kbd> add, <kbd>D</kbd> delete (or right-click a mark), <kbd>Esc</kbd> stop editing, <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo. Added marks snap to the largest deflection within 40 ms of the click. <kbd>C</kbd> caliper.</p>
+   <h4>HRV</h4>
+   <p>Intervals spanning dropouts or unanalyzable signal, outside the species range, or differing from their neighbours by more than the artifact threshold are excluded (grey in the tachogram). The spectrum is a Welch periodogram of the spline-resampled NN series, identical to the Python package.</p>
+   <p><button id="bHelpClose">Close</button></p></div>
+   <div id="menu">
+    <button data-x="beats">Beats and RR intervals (CSV)</button>
+    <button data-x="pw">P waves and PP intervals (CSV)</button>
+    <button data-x="hrv">HRV of the current range (CSV)</button>
+    <button data-x="epochs">HRV per epoch, whole file (CSV)</button>
+    <button data-x="signal">Signal in view, as displayed (CSV)</button>
+    <button data-x="marks">Marks, with edits (JSON, re-importable)</button>
+    <button data-x="png">Trace view (PNG)</button>
+    <button data-x="tpng">Tachogram (PNG)</button>
+   </div>
+   <div id="busy">Working&hellip;</div>
+  </div>
+  <div id="lower"><div id="tachoWrap"><canvas id="tacho"></canvas></div><div id="hrv"><h3>Heart rate variability</h3><div class="sub">Detect or import beats to compute HRV.</div></div></div>
+ </div>
+ <div id="status">
+  <span id="cursor">&nbsp;</span>
+  <span class="leg"><span><i class="sw" style="background:var(--r)"></i>R / RR</span><span><i class="sw" style="background:var(--p)"></i>P / PP</span><span><i class="sw" style="background:var(--bad)"></i>dropout or unanalyzable</span></span>
+  <span id="calInfo"></span><span id="msg"></span>
+ </div>
+</div>
+<script>
+"use strict";
+/* ============================================================================================
+   TeleEP Viewer - single-file EDF viewer with filtering, R-peak detection, beat editing,
+   RR/PP interval and HRV analysis, and export. No network access; the file never leaves the computer.
+   ============================================================================================ */
+const $ = id => document.getElementById(id);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const PRESETS = {
+  pig:   {band:[5,40],  qrs:80,  minRR:220, range:[240,3000], bands:{VLF:[0.0033,0.05],LF:[0.05,0.16],HF:[0.16,0.61]}, pnn:[50], interp:4,  win:64},
+  human: {band:[5,30],  qrs:100, minRR:250, range:[300,2000], bands:{VLF:[0.0033,0.04],LF:[0.04,0.15],HF:[0.15,0.4]},  pnn:[50], interp:4,  win:64},
+  dog:   {band:[5,40],  qrs:60,  minRR:200, range:[200,3000], bands:{VLF:[0.0033,0.067],LF:[0.067,0.235],HF:[0.235,0.877]}, pnn:[50], interp:4, win:64},
+  rat:   {band:[10,100],qrs:25,  minRR:100, range:[100,500],  bands:{VLF:[0.0033,0.19],LF:[0.19,0.74],HF:[0.78,2.5]},   pnn:[50,6], interp:10, win:25.6},
+  mouse: {band:[10,150],qrs:15,  minRR:60,  range:[60,400],   bands:{VLF:[0.0056,0.152],LF:[0.152,1.24],HF:[1.24,3.471]}, pnn:[6], interp:20, win:12.8},
+};
+const PP_RANGE = [150, 3000];
+
+/* ------------------------------------------------------------------------------------ EDF */
+function parseEDF(buf){
+  const td = new TextDecoder("latin1"), u8 = new Uint8Array(buf);
+  const A = (o,l) => td.decode(u8.subarray(o,o+l)).trim();
+  const ns = parseInt(A(252,4),10), hb = parseInt(A(184,8),10);
+  let nRec = parseInt(A(236,8),10); const recDur = parseFloat(A(244,8));
+  const patient = A(8,80), recording = A(88,80), type = A(192,44);
+  const f = (off,w) => { const out=[]; for(let i=0;i<ns;i++) out.push(A(256+off*ns+i*w, w)); return out; };
+  const lab=f(0,16), unit=f(96,8), pmin=f(104,8).map(Number), pmax=f(112,8).map(Number),
+        dmin=f(120,8).map(Number), dmax=f(128,8).map(Number), spr=f(216,8).map(Number);
+  const recSamples = spr.reduce((a,b)=>a+b,0);
+  const maxRec = Math.floor((buf.byteLength-hb)/(2*recSamples));
+  if(!(nRec>=0) || nRec>maxRec) nRec = maxRec;
+  const sigs=[]; let off=0;
+  for(let i=0;i<ns;i++){
+    const isAnn = lab[i].replace(/\s+/g,"").toLowerCase()==="edfannotations";
+    sigs.push({index:i,label:lab[i]||("signal "+i),unit:unit[i],spr:spr[i],fs:spr[i]/recDur,pmin:pmin[i],dmin:dmin[i],
+      gain:(pmax[i]-pmin[i])/(dmax[i]-dmin[i]),off,isAnn,n:spr[i]*nRec});
+    off += spr[i];
+  }
+  const seen={}; for(const s of sigs){ if(s.isAnn) continue; seen[s.label]=(seen[s.label]||0)+1; if(seen[s.label]>1) s.label=`${s.label}_${seen[s.label]}`; }
+  // start date/time (naive local, stored as UTC fields)
+  const d = A(168,8).split(".").map(Number), t = A(176,8).split(".").map(Number);
+  let year = d[2] >= 85 ? 1900+d[2] : 2000+d[2];
+  const m = recording.match(/Startdate (\d\d)-([A-Z]{3})-(\d{4})/i); if(m) year = parseInt(m[3],10);
+  let start = new Date(Date.UTC(year, d[1]-1, d[0], t[0], t[1], t[2]));
+  const edf = {buf,ns,hb,nRec,recDur,recSamples,sigs,start,patient,recording,type,duration:nRec*recDur,annotations:[],firstTal:null};
+  edf.annotations = readAnnotations(edf);
+  // EDF+: the time-keeping annotation of the first record holds the fraction of a second by which
+  // the first sample follows the header start time; annotation onsets are made relative to the first sample
+  if(edf.firstTal!==null && edf.firstTal>0 && edf.firstTal<1){
+    edf.start = new Date(start.getTime() + edf.firstTal*1000);
+    edf.annotations.forEach(a=>{ a.onset -= edf.firstTal; });
+  }
+  const z = recording.match(/\bUTC(?:([+-])(\d{1,2}):?(\d{2}))?(?![\w:+-])/);
+  edf.utcLabel = z ? z[0] : "";
+  edf.railMissing = /ponemah/i.test(recording) || edf.annotations.some(a=>a.text.startsWith("Signal dropout"));
+  return edf;
+}
+function readAnnotations(edf){
+  const out=[]; const ann = edf.sigs.filter(s=>s.isAnn); const td=new TextDecoder("utf-8");
+  for(const s of ann){
+    for(let r=0;r<edf.nRec;r++){
+      const b = new Uint8Array(edf.buf, edf.hb + 2*(r*edf.recSamples + s.off), 2*s.spr);
+      let i=0, first=true;
+      while(i<b.length){
+        let j=i; while(j<b.length && b[j]!==0) j++;
+        if(j>i && (b[i]===43 || b[i]===45)){
+          const tal = td.decode(b.subarray(i,j)); const parts = tal.split("\x14"); const head = parts[0].split("\x15");
+          const onset = parseFloat(head[0]), dur = head.length>1 && head[1] ? parseFloat(head[1]) : 0;
+          if(isFinite(onset)){
+            if(first && r===0 && s===ann[0]) edf.firstTal = onset;
+            first=false;
+            for(const tx of parts.slice(1)) if(tx) out.push({onset,dur,text:tx});
+          }
+        }
+        i=j+1;
+      }
+    }
+  }
+  return out.sort((a,b)=>a.onset-b.onset);
+}
+function readSignal(edf, sig, k0, k1){
+  k0 = Math.max(0, k0|0); k1 = Math.min(sig.n, k1|0);
+  const n = Math.max(0,k1-k0), out = new Float64Array(n); if(!n) return out;
+  const spr = sig.spr; let r = Math.floor(k0/spr), w = k0 - r*spr, o = 0;
+  while(o<n){
+    const arr = new Int16Array(edf.buf, edf.hb + 2*(r*edf.recSamples + sig.off), spr);
+    const take = Math.min(spr - w, n - o);
+    for(let i=0;i<take;i++){ const v = arr[w+i];
+      out[o+i] = (edf.railMissing && v <= sig.dmin) ? NaN : sig.pmin + (v - sig.dmin)*sig.gain; }
+    o += take; r++; w = 0;
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------------------------------ DSP */
+function fillNaN(x){
+  const n=x.length, y=Float64Array.from(x); let any=false, last=-1;
+  for(let i=0;i<n;i++){ if(isFinite(y[i])){ if(last<i-1){ const v0 = last>=0 ? y[last] : y[i];
+        for(let k=last+1;k<i;k++) y[k] = last>=0 ? v0 + (y[i]-v0)*(k-last)/(i-last) : y[i]; } last=i; } else any=true; }
+  if(last<0) y.fill(0); else for(let k=last+1;k<n;k++) y[k]=y[last];
+  return {y, any};
+}
+function restoreNaN(y, x){ for(let i=0;i<y.length;i++) if(!isFinite(x[i])) y[i]=NaN; return y; }
+function butterSections(type, fc, fs, order){
+  const secs=[], n=order, w0=2*Math.PI*fc/fs, c=Math.cos(w0), s=Math.sin(w0);
+  for(let k=0;k<n/2;k++){
+    const Q = 1/(2*Math.cos((2*k+1)*Math.PI/(2*n))), al = s/(2*Q), a0 = 1+al;
+    if(type==="lp") secs.push({b0:(1-c)/2/a0,b1:(1-c)/a0,b2:(1-c)/2/a0,a1:-2*c/a0,a2:(1-al)/a0});
+    else secs.push({b0:(1+c)/2/a0,b1:-(1+c)/a0,b2:(1+c)/2/a0,a1:-2*c/a0,a2:(1-al)/a0});
+  }
+  return secs;
+}
+function notchSection(f0, fs, Q){ const w0=2*Math.PI*f0/fs, c=Math.cos(w0), al=Math.sin(w0)/(2*Q), a0=1+al;
+  return {b0:1/a0,b1:-2*c/a0,b2:1/a0,a1:-2*c/a0,a2:(1-al)/a0}; }
+function sosRun(secs, y){
+  for(const q of secs){ let z1=0,z2=0;
+    // steady-state start for a constant input equal to the first sample
+    const x0=y[0], g=(q.b0+q.b1+q.b2)/(1+q.a1+q.a2), yss=g*x0; z1 = yss - q.b0*x0; z2 = q.b2*x0 - q.a2*yss;
+    for(let i=0;i<y.length;i++){ const xi=y[i], yi=q.b0*xi+z1; z1=q.b1*xi - q.a1*yi + z2; z2=q.b2*xi - q.a2*yi; y[i]=yi; } }
+}
+function filtfilt(secs, x, padlen){
+  const n=x.length; if(n<4||!secs.length) return Float64Array.from(x);
+  const p=Math.max(1,Math.min(n-1,padlen|0)), m=n+2*p, y=new Float64Array(m);
+  for(let i=0;i<p;i++){ y[i]=2*x[0]-x[p-i]; y[m-1-i]=2*x[n-1]-x[n-1-(p-i)]; }
+  y.set(x,p);
+  sosRun(secs,y); y.reverse(); sosRun(secs,y); y.reverse();
+  return y.slice(p,p+n);
+}
+function bandFilter(x, fs, lo, hi, order){
+  let secs=[]; order = order||4;
+  if(lo>0 && lo<fs/2) secs = secs.concat(butterSections("hp",lo,fs,order));
+  if(hi>0 && hi<fs/2) secs = secs.concat(butterSections("lp",hi,fs,order));
+  const pad = lo>0 ? Math.round(3*fs/lo) : Math.round(0.5*fs);
+  return filtfilt(secs, x, pad);
+}
+function runningMedian(x, w){ const n=x.length, h=w>>1, out=new Float64Array(n), buf=[];
+  for(let i=0;i<n;i++){ const a=Math.max(0,i-h), b=Math.min(n,i+h+1); buf.length=0; for(let k=a;k<b;k++) buf.push(x[k]); buf.sort((p,q)=>p-q); out[i]=buf[buf.length>>1]; }
+  return out; }
+function displayFilter(x, fs){
+  if(!$("fOn").checked) return x;
+  const f = fillNaN(x); let y = f.y;
+  if($("base").checked){ let b = runningMedian(y, Math.round(0.2*fs)|1); b = runningMedian(b, Math.round(0.6*fs)|1); y = y.map((v,i)=>v-b[i]); }
+  const hp = parseFloat($("hp").value)||0, lp = parseFloat($("lp").value)||0;
+  y = bandFilter(y, fs, hp, lp, 4);
+  const nf = parseFloat($("notch").value)||0;
+  if(nf>0 && nf<fs/2) y = filtfilt([notchSection(nf,fs,30)], y, Math.round(fs));
+  return f.any ? restoreNaN(y,x) : y;
+}
+function quantile(arr, q){ const a=Array.from(arr).filter(Number.isFinite).sort((p,r)=>p-r); if(!a.length) return NaN;
+  const i=q*(a.length-1), lo=Math.floor(i), hi=Math.ceil(i); return a[lo]+(a[hi]-a[lo])*(i-lo); }
+const median = a => quantile(a, 0.5);
+function amin(a){ let m=Infinity; for(const v of a) if(v<m) m=v; return m; }
+function amax(a){ let m=-Infinity; for(const v of a) if(v>m) m=v; return m; }
+function mean(a){ let s=0; for(const v of a) s+=v; return s/a.length; }
+function sd(a){ if(a.length<2) return NaN; const m=mean(a); let s=0; for(const v of a) s+=(v-m)*(v-m); return Math.sqrt(s/(a.length-1)); }
+
+/* -------------------------------------------------------------------------- R-peak detector */
+function findPeaks(f, dist){
+  const c=[]; for(let i=1;i<f.length-1;i++) if(f[i]>f[i-1] && f[i]>=f[i+1]) c.push(i);
+  if(dist<=1) return c;
+  const order = c.map((v,i)=>i).sort((a,b)=>f[c[b]]-f[c[a]]), keep=new Uint8Array(c.length).fill(1);
+  for(const oi of order){ if(!keep[oi]) continue; const p=c[oi];
+    for(let j=oi-1;j>=0 && p-c[j]<dist;j--) keep[j]=0; for(let j=oi+1;j<c.length && c[j]-p<dist;j++) keep[j]=0; }
+  return c.filter((v,i)=>keep[i]);
+}
+function detectR(X, fs, pr){
+  const nl=X.length, n=X[0].length, lo=Math.min(pr.band[0], 0.225*fs), hi=Math.min(pr.band[1], 0.45*fs);
+  const qrs=Math.max(3,Math.round(pr.qrs/1000*fs)), minRR=Math.max(1,Math.round(pr.minRR/1000*fs));
+  const Z=[], snr=[], missAll=new Uint8Array(n).fill(1);
+  for(let l=0;l<nl;l++){
+    const fl=fillNaN(X[l]); const y=bandFilter(fl.y, fs, lo, hi, 2);
+    const good=[]; for(let i=0;i<n;i+=3) if(isFinite(X[l][i])) good.push(y[i]);
+    const med=median(good), noise=1.4826*median(good.map(v=>Math.abs(v-med)))+1e-12;
+    for(let i=0;i<n;i++){ if(isFinite(X[l][i])){ y[i]/=noise; missAll[i]=0; } else y[i]=0; }
+    Z.push(y); const ab=[]; for(let i=0;i<n;i+=3) if(isFinite(X[l][i])) ab.push(Math.abs(y[i])); snr.push(quantile(ab,0.995)||0);
+  }
+  const e=new Float64Array(n), slope=new Float64Array(n);
+  for(let l=0;l<nl;l++){ const z=Z[l]; for(let i=0;i<n;i++){ const d = i===0 ? z[1]-z[0] : i===n-1 ? z[n-1]-z[n-2] : (z[i+1]-z[i-1])/2; e[i]+=d*d/nl; } }
+  for(let i=0;i<n;i++) slope[i]=Math.sqrt(e[i]);
+  const f=new Float64Array(n); { let s=0; const h=qrs>>1; for(let i=0;i<n+h;i++){ if(i<n) s+=e[i]; if(i-qrs>=0) s-=e[i-qrs]; const c=i-h; if(c>=0&&c<n) f[c]=s/qrs; } }
+  for(let i=0;i<n;i++) if(missAll[i]) f[i]=0;
+  const cand = findPeaks(f, Math.max(1,qrs>>1)).filter(i=>!missAll[i]);
+  const cmiss=new Int32Array(n+1); for(let i=0;i<n;i++) cmiss[i+1]=cmiss[i]+missAll[i];
+  const peaks = adaptive(cand, f, slope, fs, minRR, 0.25, cmiss);
+  let dom=0; for(let l=1;l<nl;l++) if(snr[l]>snr[dom]) dom=l;
+  const yd=Z[dom], segs=[];
+  for(const p of peaks) if(p-qrs>=0 && p+qrs<=n) segs.push(yd.subarray(p-qrs,p+qrs));
+  let pol=1; if(segs.length){ const L=2*qrs, mid=new Float64Array(L); const use=segs.slice(0,400);
+    for(let k=0;k<L;k++) mid[k]=median(use.map(s=>s[k])); let mx=-Infinity, mn=Infinity; for(const v of mid){ if(v>mx) mx=v; if(v<mn) mn=v; } pol = mx >= -mn ? 1 : -1; }
+  let fid=[]; for(const p of peaks){ const a=Math.max(0,p-qrs), b=Math.min(n,p+qrs); let bi=a, bv=-Infinity; for(let k=a;k<b;k++){ const v=pol*yd[k]; if(v>bv){bv=v;bi=k;} } fid.push(bi); }
+  fid = Array.from(new Set(fid)).sort((a,b)=>a-b);
+  const keep=[]; for(const p of fid){ if(keep.length && p-keep[keep.length-1]<minRR){ if(f[p]>f[keep[keep.length-1]]) keep[keep.length-1]=p; } else keep.push(p); }
+  const pre=Math.round(0.9*qrs), post=qrs+(qrs>>1), ncc=beatNCC(Z, keep, pre, post);
+  return {peaks:keep, ncc, missAll};
+}
+function adaptive(cand, f, slope, fs, minRR, frac, cmiss){
+  if(!cand.length) return [];
+  const h=cand.map(i=>f[i]);
+  let nl=0; while(nl<cand.length && cand[nl]<cand[0]+10*fs) nl++;
+  const learn=h.slice(0, Math.max(nl, Math.min(h.length,20)));
+  let spk=quantile(learn,0.95), npk=median(learn), thr=npk+frac*(spk-npk);
+  const tWave=Math.round(1.6*minRR), q4=minRR>>2;
+  const maxSlope = p => { let m=0; for(let k=Math.max(0,p-q4);k<Math.min(slope.length,p+q4);k++) if(slope[k]>m) m=slope[k]; return m; };
+  const beats=[], rr=[]; let last=-1e12, lastSlope=null, i=0;
+  const idxOf = p => { let lo=0, hi=cand.length; while(lo<hi){ const m=(lo+hi)>>1; if(cand[m]<p) lo=m+1; else hi=m; } return lo; };
+  while(i<cand.length){
+    const p=cand[i], hp=h[i];
+    if(beats.length && rr.length){
+      const ra = mean(rr.slice(-8));
+      if(p-last > 1.66*ra && cmiss[p]-cmiss[last]===0){
+        const a=idxOf(last+minRR), b=idxOf(p-minRR);
+        if(b>a){ let j=a; for(let k=a;k<b;k++) if(h[k]>h[j]) j=k;
+          if(h[j]>0.5*thr){ const q=cand[j]; beats.push(q); rr.push(q-last); last=q; lastSlope=maxSlope(q); spk=0.25*h[j]+0.75*spk; thr=npk+frac*(spk-npk); continue; } }
+      }
+    }
+    if(hp>thr && p-last>=minRR){
+      const s=maxSlope(p);
+      if(beats.length && p-last<tWave && lastSlope!==null && s<0.5*lastSlope) npk=0.125*hp+0.875*npk;
+      else { if(beats.length && cmiss[p]-cmiss[last]===0) rr.push(p-last); beats.push(p); last=p; lastSlope=s; spk=0.125*hp+0.875*spk; }
+    } else if(hp>thr && beats.length && p-last<minRR && hp>h[idxOf(last)]){ beats[beats.length-1]=p; last=p; lastSlope=maxSlope(p); }
+    else npk=0.125*hp+0.875*npk;
+    thr=npk+frac*(spk-npk); i++;
+  }
+  return Array.from(new Set(beats)).sort((a,b)=>a-b);
+}
+function beatNCC(Z, peaks, pre, post){
+  const n=Z[0].length, ok=peaks.map(p=>p-pre>=0 && p+post<=n), out=new Float64Array(peaks.length).fill(NaN);
+  const W=[]; peaks.forEach((p,i)=>{ if(!ok[i]) return; const v=[]; for(const z of Z) for(let k=p-pre;k<p+post;k++) v.push(z[k]); const m=mean(v); W.push(v.map(x=>x-m)); });
+  if(W.length<3) return out;
+  const L=W[0].length, sample=W.length>500 ? W.filter((v,i)=>i%Math.ceil(W.length/500)===0) : W;
+  const t=new Float64Array(L); for(let k=0;k<L;k++) t[k]=median(sample.map(v=>v[k])); const tm=mean(t); for(let k=0;k<L;k++) t[k]-=tm;
+  let tn=0; for(const v of t) tn+=v*v; tn=Math.sqrt(tn);
+  let j=0; peaks.forEach((p,i)=>{ if(!ok[i]) return; const v=W[j++]; let d=0, vn=0; for(let k=0;k<L;k++){ d+=v[k]*t[k]; vn+=v[k]*v[k]; } out[i]=d/(Math.sqrt(vn)*tn+1e-12); });
+  return out;
+}
+
+/* ------------------------------------------------------------------------- intervals & HRV */
+function overlapsAny(a, b, segs){ for(const s of segs){ if(s[0]<b && s[1]>a) return true; } return false; }
+function buildIntervals(times, ok, segs, range, art){
+  const n=times.length-1; if(n<1) return {t:[],ms:[],flag:[],valid:[]};
+  const sorted = segs.slice().sort((p,q)=>p[0]-q[0]);
+  const t=[], ms=[], flag=[];
+  let j0=0;
+  for(let i=0;i<n;i++){
+    const a=times[i], b=times[i+1]; t.push(b); ms.push((b-a)*1000);
+    while(j0<sorted.length && sorted[j0][1]<=a) j0++;
+    let g=false; for(let j=j0;j<sorted.length && sorted[j][0]<b;j++) if(sorted[j][1]>a){ g=true; break; }
+    let f = g ? "gap" : "";
+    if(!f && ok && !(ok[i] && ok[i+1])) f="beat";
+    if(!f && (ms[i]<range[0] || ms[i]>range[1])) f="range";
+    flag.push(f);
+  }
+  if(art>0){
+    // neighbours beyond a gap (dropout, unanalyzable signal) are not used for the local median
+    const usable=flag.map(f=>f===""), med=new Float64Array(n), run=new Int32Array(n);
+    for(let i=0,r=0;i<n;i++){ if(flag[i]==="gap") r++; run[i]=r; }
+    for(let i=0;i<n;i++){ const w=[]; for(let k=Math.max(0,i-5);k<=Math.min(n-1,i+5);k++) if(k!==i && usable[k] && run[k]===run[i]) w.push(ms[k]); med[i]= w.length ? median(w) : NaN; }
+    for(let i=0;i<n;i++) if(usable[i] && isFinite(med[i]) && Math.abs(ms[i]-med[i])/med[i] > art) flag[i]="artifact";
+  }
+  return {t, ms, flag, valid:flag.map(f=>f==="")};
+}
+function sliceSeries(s, t0, t1){ const o={t:[],ms:[],flag:[],valid:[]}; for(let i=0;i<s.t.length;i++) if(s.t[i]>=t0 && s.t[i]<t1){ o.t.push(s.t[i]); o.ms.push(s.ms[i]); o.flag.push(s.flag[i]); o.valid.push(s.valid[i]); } return o; }
+function timeDomain(s, pnn){
+  const v=s.ms.filter((x,i)=>s.valid[i]), n=s.ms.length, out={n_intervals:n, n_nn:v.length, valid_fraction:n? v.length/n : NaN};
+  const u=s.ms.filter((x,i)=>s.flag[i]!=="gap" && s.flag[i]!=="beat");
+  out.mean_interval_ms = u.length? mean(u):NaN; out.median_interval_ms = u.length? median(u):NaN; out.rate_from_median_bpm = u.length? 60000/median(u):NaN;
+  if(v.length<3) return out;
+  const hr=v.map(x=>60000/x), d=[]; for(let i=1;i<s.ms.length;i++) if(s.valid[i]&&s.valid[i-1]) d.push(s.ms[i]-s.ms[i-1]);
+  Object.assign(out,{mean_nn_ms:mean(v), median_nn_ms:median(v), sdnn_ms:sd(v), min_nn_ms:amin(v), max_nn_ms:amax(v),
+    cv_nn_pct:100*sd(v)/mean(v), mean_hr_bpm:mean(hr), sd_hr_bpm:sd(hr), min_hr_bpm:amin(hr), max_hr_bpm:amax(hr),
+    rmssd_ms: d.length? Math.sqrt(mean(d.map(x=>x*x))):NaN, sdsd_ms: d.length>1? sd(d):NaN});
+  for(const x of pnn) out["pnn"+x+"_pct"] = d.length ? 100*d.filter(y=>Math.abs(y)>x).length/d.length : NaN;
+  if(v.length>=20){ const bin=1000/128, mn=amin(v), cnt=new Map(); for(const x of v){ const k=Math.floor((x-mn)/bin); cnt.set(k,(cnt.get(k)||0)+1); } out.hrv_triangular_index = v.length/amax(cnt.values()); }
+  return out;
+}
+function naturalSpline(x, y){
+  const n=x.length, h=new Float64Array(n-1), al=new Float64Array(n), l=new Float64Array(n), mu=new Float64Array(n), z=new Float64Array(n), c=new Float64Array(n), b=new Float64Array(n-1), d=new Float64Array(n-1);
+  for(let i=0;i<n-1;i++) h[i]=x[i+1]-x[i];
+  for(let i=1;i<n-1;i++) al[i]=3/h[i]*(y[i+1]-y[i])-3/h[i-1]*(y[i]-y[i-1]);
+  l[0]=1; for(let i=1;i<n-1;i++){ l[i]=2*(x[i+1]-x[i-1])-h[i-1]*mu[i-1]; mu[i]=h[i]/l[i]; z[i]=(al[i]-h[i-1]*z[i-1])/l[i]; }
+  l[n-1]=1; for(let j=n-2;j>=0;j--){ c[j]=z[j]-mu[j]*c[j+1]; b[j]=(y[j+1]-y[j])/h[j]-h[j]*(c[j+1]+2*c[j])/3; d[j]=(c[j+1]-c[j])/(3*h[j]); }
+  return t => { let lo=0, hi=n-2; while(lo<hi){ const m=(lo+hi+1)>>1; if(x[m]<=t) lo=m; else hi=m-1; } const dx=t-x[lo]; return y[lo]+b[lo]*dx+c[lo]*dx*dx+d[lo]*dx*dx*dx; };
+}
+function detrendLinear(y){ const n=y.length; let sx=0,sy=0,sxx=0,sxy=0; for(let i=0;i<n;i++){ sx+=i; sy+=y[i]; sxx+=i*i; sxy+=i*y[i]; }
+  const den=n*sxx-sx*sx, b=den? (n*sxy-sx*sy)/den : 0, a=(sy-b*sx)/n; return y.map((v,i)=>v-(a+b*i)); }
+function fftPow(re){ // power spectrum |X_k|^2, k=0..N/2 ; radix-2 when possible
+  const N=re.length;
+  if((N&(N-1))===0){
+    const r=Float64Array.from(re), im=new Float64Array(N);
+    for(let i=1,j=0;i<N;i++){ let bit=N>>1; for(;j&bit;bit>>=1) j^=bit; j^=bit; if(i<j){ [r[i],r[j]]=[r[j],r[i]]; } }
+    for(let len=2;len<=N;len<<=1){ const ang=-2*Math.PI/len, wr=Math.cos(ang), wi=Math.sin(ang);
+      for(let i=0;i<N;i+=len){ let cr=1, ci=0; for(let k=0;k<len/2;k++){ const ur=r[i+k], ui=im[i+k], vr=r[i+k+len/2]*cr-im[i+k+len/2]*ci, vi=r[i+k+len/2]*ci+im[i+k+len/2]*cr;
+          r[i+k]=ur+vr; im[i+k]=ui+vi; r[i+k+len/2]=ur-vr; im[i+k+len/2]=ui-vi; const nr=cr*wr-ci*wi; ci=cr*wi+ci*wr; cr=nr; } } }
+    const out=new Float64Array(N/2+1); for(let k=0;k<=N/2;k++) out[k]=r[k]*r[k]+im[k]*im[k]; return out;
+  }
+  const out=new Float64Array(Math.floor(N/2)+1);
+  for(let k=0;k<out.length;k++){ let a=0,b=0; for(let t=0;t<N;t++){ const ang=-2*Math.PI*k*t/N; a+=re[t]*Math.cos(ang); b+=re[t]*Math.sin(ang); } out[k]=a*a+b*b; }
+  return out;
+}
+function welchPSD(s, pr){
+  const tv=[], rv=[]; for(let i=0;i<s.t.length;i++) if(s.valid[i]){ if(tv.length && s.t[i]===tv[tv.length-1]) continue; tv.push(s.t[i]); rv.push(s.ms[i]); }
+  if(tv.length<10 || tv[tv.length-1]-tv[0]<10) return null;
+  const fs=pr.interp, n=Math.ceil((tv[tv.length-1]-tv[0])*fs); if(n<16) return null;
+  const sp=naturalSpline(tv,rv); let y=new Float64Array(n); for(let k=0;k<n;k++) y[k]=sp(tv[0]+k/fs);
+  y=detrendLinear(y);
+  const N=Math.min(y.length, Math.max(16, Math.round(pr.win*fs))), step=N-(N>>1), w=new Float64Array(N); let ws=0;
+  for(let k=0;k<N;k++){ w[k]=0.5-0.5*Math.cos(2*Math.PI*k/N); ws+=w[k]*w[k]; }
+  const acc=new Float64Array(Math.floor(N/2)+1); let nseg=0;
+  for(let st=0; st+N<=y.length; st+=step){ const seg=y.slice(st,st+N); const m=mean(seg); for(let k=0;k<N;k++) seg[k]=(seg[k]-m)*w[k]; const p=fftPow(seg); for(let k=0;k<acc.length;k++) acc[k]+=p[k]; nseg++; }
+  const f=[], P=[]; for(let k=0;k<acc.length;k++){ let v=acc[k]/nseg/(fs*ws); if(k>0 && !(N%2===0 && k===N/2)) v*=2; f.push(k*fs/N); P.push(v); }
+  return {f, P, duration: tv[tv.length-1]-tv[0]};
+}
+function interpAt(f, P, x){ // linear interpolation, as numpy.interp
+  if(x<=f[0]) return P[0]; const n=f.length; if(x>=f[n-1]) return P[n-1];
+  let lo=0, hi=n-1; while(hi-lo>1){ const m=(lo+hi)>>1; if(f[m]<=x) lo=m; else hi=m; }
+  return P[lo]+(P[hi]-P[lo])*(x-f[lo])/(f[hi]-f[lo]); }
+function bandPower(f, P, lo, hi){ // trapezoidal integral with the PSD interpolated at the band edges
+  lo=Math.max(lo, f[0]); hi=Math.min(hi, f[f.length-1]); if(!(hi>lo)) return NaN;
+  const x=[lo], y=[interpAt(f,P,lo)];
+  for(let k=0;k<f.length;k++) if(f[k]>lo && f[k]<hi){ x.push(f[k]); y.push(P[k]); }
+  x.push(hi); y.push(interpAt(f,P,hi));
+  let a=0; for(let k=1;k<x.length;k++) a+=(y[k]+y[k-1])/2*(x[k]-x[k-1]); return a; }
+function freqDomain(s, pr){
+  const out={}, sp=welchPSD(s, pr), names=Object.keys(pr.bands);
+  for(const b of names){ out[b.toLowerCase()+"_power_ms2"]=NaN; out[b.toLowerCase()+"_peak_hz"]=NaN; }
+  out.total_power_ms2=NaN; out.lf_hf_ratio=NaN; out.lf_nu=NaN; out.hf_nu=NaN; out._spec=sp;
+  if(!sp) return out;
+  let tot=0, anyb=false;
+  for(const b of names){ const [lo,hi]=pr.bands[b]; const idx=[]; sp.f.forEach((v,i)=>{ if(v>=lo && v<hi) idx.push(i); });
+    const resolvable = b.toUpperCase()!=="VLF" || sp.duration >= 1/Math.max(lo,1e-9);
+    if(idx.length>=1 && resolvable){ const a=bandPower(sp.f, sp.P, lo, hi);
+      let pk=idx[0]; for(const k of idx) if(sp.P[k]>sp.P[pk]) pk=k; out[b.toLowerCase()+"_power_ms2"]=a; out[b.toLowerCase()+"_peak_hz"]=sp.f[pk]; tot+=a; anyb=true; } }
+  if(anyb) out.total_power_ms2=tot;
+  const lf=out.lf_power_ms2, hf=out.hf_power_ms2;
+  if(isFinite(hf) && hf>0) out.lf_hf_ratio=lf/hf;
+  if(isFinite(lf+hf) && lf+hf>0){ out.lf_nu=100*lf/(lf+hf); out.hf_nu=100*hf/(lf+hf); }
+  return out;
+}
+function poincare(s){ const x=[], y=[]; for(let i=1;i<s.ms.length;i++) if(s.valid[i]&&s.valid[i-1]){ x.push(s.ms[i-1]); y.push(s.ms[i]); }
+  if(x.length<3) return {sd1_ms:NaN, sd2_ms:NaN, sd1_sd2_ratio:NaN, ellipse_area_ms2:NaN};
+  const d=x.map((v,i)=>(y[i]-v)/Math.SQRT2), a=x.map((v,i)=>(y[i]+v)/Math.SQRT2), s1=sd(d), s2=sd(a);
+  return {sd1_ms:s1, sd2_ms:s2, sd1_sd2_ratio:s1/s2, ellipse_area_ms2:Math.PI*s1*s2}; }
+function sampEn(v, m=2, r=0.2, maxN=5000){
+  if(v.length>maxN) v=v.slice(0,maxN); const n=v.length; if(n<m+10) return NaN; const tol=r*sd(v); if(!(tol>0)) return NaN;
+  const cnt=mm=>{ const N=n-m; let c=0; for(let i=0;i<N-1;i++) for(let j=i+1;j<N;j++){ let ok=true; for(let k=0;k<mm;k++) if(Math.abs(v[i+k]-v[j+k])>tol){ ok=false; break; } if(ok) c++; } return c; };
+  const B=cnt(m), A=cnt(m+1); return (A>0 && B>0) ? -Math.log(A/B) : NaN; }
+function dfa(v, scales){
+  scales=scales.filter(s=>s>=4 && s<=Math.floor(v.length/4)); if(scales.length<3) return NaN;
+  const m=mean(v), y=[]; let acc=0; for(const x of v){ acc+=x-m; y.push(acc); }
+  const L=[], F=[];
+  for(const sc of scales){ const nb=Math.floor(y.length/sc); let ss=0, cnt=0; const tm=(sc-1)/2; let stt=0; for(let k=0;k<sc;k++) stt+=(k-tm)*(k-tm);
+    for(let b=0;b<nb;b++){ let my=0; for(let k=0;k<sc;k++) my+=y[b*sc+k]; my/=sc; let sty=0; for(let k=0;k<sc;k++) sty+=(k-tm)*(y[b*sc+k]-my); const sl=sty/stt;
+      for(let k=0;k<sc;k++){ const r=y[b*sc+k]-(my+sl*(k-tm)); ss+=r*r; cnt++; } }
+    const fl=Math.sqrt(ss/cnt); if(fl>0){ L.push(Math.log(sc)); F.push(Math.log(fl)); } }
+  if(L.length<3) return NaN; const mx=mean(L), my=mean(F); let a=0,b=0; for(let i=0;i<L.length;i++){ a+=(L[i]-mx)*(F[i]-my); b+=(L[i]-mx)**2; } return a/b; }
+function hrvAll(s, pr){
+  const out=timeDomain(s, pr.pnn); Object.assign(out, freqDomain(s, pr)); Object.assign(out, poincare(s));
+  const v=s.ms.filter((x,i)=>s.valid[i]); out.sampen=sampEn(v); out.dfa_alpha1=dfa(v,[4,5,6,7,8,9,10,11,12,13,14,15,16]); out.dfa_alpha2=dfa(v,[16,20,24,28,32,40,48,56,64]);
+  return out;
+}
+
+/* ------------------------------------------------------------------------------------ state */
+const cv=$("cv"), ctx=cv.getContext("2d"), tc=$("tacho"), tctx=tc.getContext("2d");
+let edf=null, fileName="", ecg=[], shown=new Set(), t0=0, winSec=10, gainMul=1, autoGain=true;
+let R=[], Rok=[], Rconf=[], P=[], Pok=[], bad=[], badP=[], marksSource="";
+let RRs=null, PPs=null, sel=null, editMode=null, caliper=false, calPts=[], undo=[];
+let drag=null, tdrag=null, cache=null, hrvRange="file";
+const preset = () => PRESETS[$("species").value];
+function setMsg(m){ $("msg").textContent=m||""; }
+function busy(on){ $("busy").style.display = on ? "block" : "none"; }
+function fmtClock(sec, withMs){ if(!edf) return ""; const d=new Date(edf.start.getTime()+sec*1000);
+  const p=v=>String(v).padStart(2,"0"); let s=`${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
+  if(withMs) s+="."+String(d.getUTCMilliseconds()).padStart(3,"0"); return s; }
+function fmtDate(sec){ const d=new Date(edf.start.getTime()+sec*1000), p=v=>String(v).padStart(2,"0");
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth()+1)}-${p(d.getUTCDate())} ${fmtClock(sec,true)}`; }
+
+/* -------------------------------------------------------------------------------- loading */
+$("fEdf").addEventListener("change", e=>{ const f=e.target.files[0]; if(!f) return; fileName=f.name; const fr=new FileReader(); busy(true);
+  fr.onload=()=>{ try{ loadEDF(fr.result); } catch(err){ console.error(err); setMsg("Could not read EDF: "+err.message); } busy(false); };
+  fr.readAsArrayBuffer(f); e.target.value=""; });
+function loadEDF(buf){
+  edf=parseEDF(buf); const data=edf.sigs.filter(s=>!s.isAnn && s.spr>0);
+  ecg = data.filter(s=>/ecg/i.test(s.label)); if(!ecg.length){ const maxFs=Math.max(...data.map(s=>s.fs)); ecg=data.filter(s=>s.fs===maxFs); }
+  shown=new Set(ecg.map(s=>s.index)); t0=0; sel=null; R=[];Rok=[];Rconf=[];P=[];Pok=[];bad=[];badP=[];undo=[]; marksSource=""; cache=null;
+  // dropouts (all ECG leads missing) and annotated dropouts become excluded stretches
+  bad = edf.annotations.filter(a=>a.text.startsWith("Signal dropout")).map(a=>[a.onset, a.onset+a.dur]);
+  const box=$("leadBoxes"); box.innerHTML='<label>Show</label>';
+  for(const s of data){ const l=document.createElement("label"); l.className="leadbox"; l.innerHTML=`<input type="checkbox" ${shown.has(s.index)?"checked":""}> ${s.label}`;
+    l.querySelector("input").addEventListener("change",ev=>{ if(ev.target.checked) shown.add(s.index); else shown.delete(s.index); cache=null; draw(); }); box.appendChild(l); }
+  const dl=$("detLead"); dl.innerHTML=""; const o=document.createElement("option"); o.value="all"; o.textContent="all ECG leads"; dl.appendChild(o);
+  for(const s of ecg){ const q=document.createElement("option"); q.value=s.index; q.textContent=s.label; dl.appendChild(q); }
+  const drop=mergeSegs(bad).reduce((a,b)=>a+b[1]-b[0],0);
+  $("fileInfo").innerHTML=`<b>${fileName}</b> &nbsp;${fmtDate(0)}${edf.utcLabel?" ("+edf.utcLabel+")":""} &middot; ${(edf.duration/3600).toFixed(2)} h &middot; ${data.length} signals`+(drop?` &middot; dropout ${drop.toFixed(1)} s`:"");
+  recompute(); fit(); setMsg("Loaded. Detect R peaks, or import marks from teleep analyze.");
+}
+$("fMarks").addEventListener("change", e=>{ const f=e.target.files[0]; if(!f) return; const fr=new FileReader();
+  fr.onload=()=>{ try{ importMarks(JSON.parse(fr.result), f.name); } catch(err){ setMsg("Marks import failed: "+err.message); } }; fr.readAsText(f); e.target.value=""; });
+function importMarks(o, name){
+  if(!o.qrs) throw new Error("not a marks file");
+  if(edf && o.file && o.file!==fileName) setMsg(`Note: marks were made for ${o.file}`);
+  pushUndo(); R=o.qrs.slice(); Rconf=(o.qrs_conf||R.map(()=>1)).slice();
+  Rok = o.qrs_good ? o.qrs_good.map(v=>!!v) : Rconf.map(c=>c>=0.5);
+  P=(o.p||[]).slice(); Pok = o.p_good ? o.p_good.map(v=>!!v) : P.map(()=>true);
+  bad=(o.bad||[]).map(s=>s.slice()); badP=(o.bad_p||[]).map(s=>s.slice()); marksSource=name; recompute(); draw();
+  setMsg(`Imported ${R.length} QRS and ${P.length} P marks from ${name}`);
+}
+
+/* ------------------------------------------------------------------------------- detection */
+$("bDetect").onclick=()=>{ if(!edf) return; busy(true); setMsg("Detecting R peaks…"); setTimeout(()=>{ try{ detectAll(); } catch(err){ console.error(err); setMsg("Detection failed: "+err.message); } busy(false); }, 30); };
+function detectAll(){
+  const pr=preset(), sel_=$("detLead").value, leads= sel_==="all" ? ecg : ecg.filter(s=>String(s.index)===sel_);
+  const fs=leads[0].fs, chunk=600, ov=5, out=[], conf=[], drops=[];
+  for(let a=0; a<edf.duration; a+=chunk){
+    const b=Math.min(edf.duration,a+chunk), ra=Math.max(0,a-ov), rb=Math.min(edf.duration,b+ov), k0=Math.round(ra*fs), k1=Math.round(rb*fs);
+    const X=leads.map(s=>readSignal(edf,s,k0,k1)); let finite=0; for(const v of X[0]) if(isFinite(v)) finite++; if(finite<5*fs) { drops.push([a,b]); continue; }
+    const res=detectR(X, fs, pr);
+    res.peaks.forEach((p,i)=>{ const t=ra+p/fs; if(t>=a && t<b){ out.push(t); conf.push(res.ncc[i]); } });
+    let st=-1; for(let i=0;i<=res.missAll.length;i++){ const m=i<res.missAll.length && res.missAll[i]; if(m && st<0) st=i; if(!m && st>=0){ const s0=ra+st/fs, s1=ra+i/fs; if(s1>a && s0<b) drops.push([Math.max(s0,a),Math.min(s1,b)]); st=-1; } }
+  }
+  // a similarity that cannot be computed (NaN, beat at the edge of the signal) is not penalized
+  pushUndo(); R=out; Rconf=conf; Rok=conf.map(c=>!(c<0.5)); P=[]; Pok=[]; badP=[]; bad=mergeSegs(drops);
+  marksSource="detected ("+$("species").value+")"; recompute(); draw();
+  setMsg(`Detected ${R.length} R peaks (${R.filter((v,i)=>!Rok[i]).length} atypical beats, excluded from HRV)`);
+}
+function mergeSegs(s){ s=s.slice().sort((a,b)=>a[0]-b[0]); const o=[]; for(const x of s){ if(o.length && x[0]<=o[o.length-1][1]) o[o.length-1][1]=Math.max(o[o.length-1][1],x[1]); else o.push([x[0],x[1]]); } return o; }
+
+/* ------------------------------------------------------------------------- analysis update */
+function recompute(){
+  const pr=preset(), art=(parseFloat($("art").value)||0)/100;
+  RRs = R.length>1 ? buildIntervals(R, Rok, bad, pr.range, art) : null;
+  PPs = P.length>1 ? buildIntervals(P, Pok, mergeSegs(bad.concat(badP)), PP_RANGE, art) : null;
+  updateHRV(); drawTacho();
+}
+function currentRange(){ if(!edf) return [0,0];
+  if(hrvRange==="sel" && sel) return [Math.min(sel[0],sel[1]), Math.max(sel[0],sel[1])];
+  if(hrvRange==="view") return [t0, t0+winSec];
+  return [0, edf.duration]; }
+let lastHRV=null;
+function updateHRV(){
+  const el=$("hrv"); if(!edf || !RRs){ el.innerHTML='<h3>Heart rate variability</h3><div class="sub">Detect or import beats to compute HRV.</div>'; lastHRV=null; return; }
+  const [a,b]=currentRange(), pr=preset();
+  const res={RR:hrvAll(sliceSeries(RRs,a,b),pr)}; if(PPs) res.PP=hrvAll(sliceSeries(PPs,a,b),pr); lastHRV={range:[a,b], res};
+  const cols=Object.keys(res), f=(v,d)=>isFinite(v)? v.toFixed(d):"-";
+  const rows=[["Counts"],["Intervals","n_intervals",0],["NN (valid)","n_nn",0],["Valid fraction","valid_fraction",3],
+    ["Rate"],["Mean rate, NN (/min)","mean_hr_bpm",1],["Rate from median, all (/min)","rate_from_median_bpm",1],["Min / max rate (/min)","_minmax",0],
+    ["Time domain"],["Mean NN (ms)","mean_nn_ms",1],["SDNN (ms)","sdnn_ms",2],["RMSSD (ms)","rmssd_ms",2],["SDSD (ms)","sdsd_ms",2]]
+    .concat(pr.pnn.map(x=>[`pNN${x} (%)`,`pnn${x}_pct`,2])).concat([["CV (%)","cv_nn_pct",2],["Triangular index","hrv_triangular_index",2],
+    ["Frequency domain (Welch)"]]).concat(Object.keys(pr.bands).map(k=>[`${k} ${pr.bands[k][0]}-${pr.bands[k][1]} Hz (ms²)`,k.toLowerCase()+"_power_ms2",2]))
+    .concat([["LF/HF","lf_hf_ratio",3],["LF / HF (n.u.)","_nu",1],["HF peak (Hz)","hf_peak_hz",3],
+    ["Nonlinear"],["Poincaré SD1 (ms)","sd1_ms",2],["Poincaré SD2 (ms)","sd2_ms",2],["Sample entropy","sampen",3],["DFA α1","dfa_alpha1",3],["DFA α2","dfa_alpha2",3]]);
+  let h=`<h3>Heart rate variability</h3><div class="sub">Range: <select id="rangeSel"><option value="file">whole file</option><option value="view">visible window</option><option value="sel" ${sel?"":"disabled"}>tachogram selection</option></select> &nbsp;${fmtClock(a)} to ${fmtClock(b)} (${((b-a)/60).toFixed(1)} min)${marksSource?`<br>Beats: ${marksSource}`:""}</div><table><tr><th></th>${cols.map(c=>`<th>${c==="RR"?"RR (ventricular)":"PP (atrial)"}</th>`).join("")}</tr>`;
+  for(const r of rows){ if(r.length===1){ h+=`<tr class="grp"><td colspan="${cols.length+1}">${r[0]}</td></tr>`; continue; }
+    h+=`<tr><td>${r[0]}</td>`+cols.map(c=>{ const o=res[c]; if(r[1]==="_minmax") return `<td>${f(o.min_hr_bpm,0)} / ${f(o.max_hr_bpm,0)}</td>`; if(r[1]==="_nu") return `<td>${f(o.lf_nu,1)} / ${f(o.hf_nu,1)}</td>`; return `<td>${f(o[r[1]],r[2])}</td>`; }).join("")+"</tr>"; }
+  el.innerHTML=h+"</table>"; $("rangeSel").value=hrvRange; $("rangeSel").onchange=e=>{ hrvRange=e.target.value; updateHRV(); };
+}
+
+/* ---------------------------------------------------------------------------------- drawing */
+function fit(){ const dpr=window.devicePixelRatio||1;
+  for(const c of [cv,tc]){ const r=c.getBoundingClientRect(); c.width=Math.max(10,r.width*dpr); c.height=Math.max(10,r.height*dpr); c.getContext("2d").setTransform(dpr,0,0,dpr,0,0); }
+  cache=null; draw(); drawTacho(); }
+window.addEventListener("resize", fit);
+function layout(){ const W=cv.clientWidth, H=cv.clientHeight, padL=78, padR=14, padT=10, padB=22; const lanes=edf? edf.sigs.filter(s=>shown.has(s.index)):[];
+  return {W,H,padL,padR,padT,padB,lanes,laneH:(H-padT-padB)/Math.max(1,lanes.length),plotW:W-padL-padR}; }
+const xOf=(t,L)=>L.padL+(t-t0)/winSec*L.plotW;
+function windowData(L){
+  const key=[t0,winSec,[...shown].join(","),$("fOn").checked,$("hp").value,$("lp").value,$("notch").value,$("base").checked,L.plotW].join("|");
+  if(cache && cache.key===key) return cache;
+  const lanes=[];
+  for(const s of L.lanes){ const fs=s.fs, k0=Math.floor(t0*fs), k1=Math.ceil((t0+winSec)*fs)+1, pad=Math.min(k0, Math.round(fs*Math.max(2, 6/Math.max(0.1,parseFloat($("hp").value)||0.5))));
+    let x=readSignal(edf,s,k0-pad,k1); if(s.fs>=50) x=displayFilter(x,fs); x=x.subarray(pad);
+    lanes.push({s, x, k0}); }
+  cache={key,lanes}; return cache;
+}
+function draw(){
+  const L=layout(); ctx.clearRect(0,0,L.W,L.H); ctx.fillStyle=css("--panel"); ctx.fillRect(0,0,L.W,L.H); if(!edf) return;
+  const t1=t0+winSec, W=windowData(L), C={r:css("--r"),p:css("--p"),ink:css("--ink"),ink2:css("--ink2"),muted:css("--muted"),line:css("--line"),trace:css("--trace")};
+  // excluded stretches
+  ctx.fillStyle=css("--bad");
+  for(const s of bad.concat(badP)){ if(s[1]<t0||s[0]>t1) continue; const a=xOf(Math.max(s[0],t0),L), b=xOf(Math.min(s[1],t1),L); ctx.fillRect(a,L.padT,Math.max(1,b-a),L.H-L.padT-L.padB); }
+  // time grid
+  const steps=[0.04,0.2,1,2,5,10,30,60,120,300,600,1800,3600]; let step=steps.find(s=>winSec/s<=14)||3600; const major=steps.find(s=>winSec/s<=8)||3600;
+  ctx.lineWidth=1;
+  for(let t=Math.ceil(t0/step)*step;t<=t1;t+=step){ const x=xOf(t,L); ctx.strokeStyle=css("--grid"); ctx.beginPath(); ctx.moveTo(x,L.padT); ctx.lineTo(x,L.H-L.padB); ctx.stroke(); }
+  ctx.fillStyle=css("--ink2"); ctx.font="11px system-ui,Arial";
+  for(let t=Math.ceil(t0/major)*major;t<=t1;t+=major){ const x=xOf(t,L); ctx.fillText(fmtClock(t, winSec<=5), x+3, L.H-7); }
+  // traces
+  W.lanes.forEach((ln,i)=>{
+    const top=L.padT+i*L.laneH, mid=top+L.laneH/2, x=ln.x, fs=ln.s.fs;
+    ctx.strokeStyle=css("--line"); ctx.beginPath(); ctx.moveTo(L.padL,top+L.laneH); ctx.lineTo(L.W-L.padR,top+L.laneH); ctx.stroke();
+    ctx.fillStyle=css("--ink"); ctx.font="600 12px system-ui,Arial"; ctx.fillText(ln.s.label,8,top+16);
+    ctx.fillStyle=css("--ink2"); ctx.font="11px system-ui,Arial"; ctx.fillText(`${ln.s.unit} · ${+ln.s.fs.toFixed(2)} Hz`,8,top+30);
+    if(!x.length) return;
+    let lo=quantile(x.filter((v,j)=>j%Math.max(1,Math.floor(x.length/3000))===0),0.002), hi=quantile(x.filter((v,j)=>j%Math.max(1,Math.floor(x.length/3000))===0),0.998);
+    if(!isFinite(lo)){ lo=-1; hi=1; } if(hi-lo<1e-9){ hi+=0.5; lo-=0.5; }
+    const g=(L.laneH*0.82)/(hi-lo)*(autoGain?1:gainMul), c=(hi+lo)/2;
+    if(ln.s.unit==="mV" && L.laneH>60){ // 1 mV scale bar where it fits
+      const h=g*1; if(h>8 && h<L.laneH*0.9){ ctx.strokeStyle=css("--ink2"); ctx.beginPath(); ctx.moveTo(L.padL-10,mid+h/2); ctx.lineTo(L.padL-10,mid-h/2); ctx.stroke(); ctx.fillText("1 mV",L.padL-44,mid+4); } }
+    ctx.save(); ctx.beginPath(); ctx.rect(L.padL,top,L.plotW,L.laneH); ctx.clip();
+    ctx.strokeStyle=css("--trace"); ctx.lineWidth=1.1; ctx.beginPath();
+    const spp=(winSec*fs)/L.plotW, k0=Math.floor(t0*fs);
+    const yOf=v=>mid-(v-c)*g;
+    if(spp>2){ let pen=false;
+      for(let px=0;px<L.plotW;px++){ const a=Math.floor(px*spp), b=Math.min(x.length,Math.floor((px+1)*spp)+1); let mn=Infinity,mx=-Infinity;
+        for(let k=a;k<b;k++){ const v=x[k]; if(v<mn) mn=v; if(v>mx) mx=v; }
+        if(!isFinite(mn)){ pen=false; continue; } const X=L.padL+px; if(!pen){ ctx.moveTo(X,yOf(mx)); pen=true; } ctx.lineTo(X,yOf(mx)); ctx.lineTo(X,yOf(mn)); } }
+    else { let pen=false; for(let k=0;k<x.length;k++){ const t=(ln.k0+k)/fs; const X=xOf(t,L), v=x[k]; if(!isFinite(v)){ pen=false; continue; } if(!pen){ ctx.moveTo(X,yOf(v)); pen=true; } else ctx.lineTo(X,yOf(v)); } }
+    ctx.stroke(); ctx.restore();
+    // marks
+    const drawTri=(t,col,up,ok,size)=>{ const X=xOf(t,L), Y= up ? top+L.laneH-6 : top+6; ctx.beginPath();
+      if(up){ ctx.moveTo(X,Y-size); ctx.lineTo(X-size*0.8,Y+2); ctx.lineTo(X+size*0.8,Y+2); } else { ctx.moveTo(X,Y+size); ctx.lineTo(X-size*0.8,Y-2); ctx.lineTo(X+size*0.8,Y-2); }
+      ctx.closePath(); if(ok){ ctx.fillStyle=col; ctx.fill(); } else { ctx.strokeStyle=col; ctx.lineWidth=1.3; ctx.stroke(); } };
+    const iA=lowerBound(R,t0-0.5), iB=lowerBound(R,t1+0.5), dense=(iB-iA)>L.plotW/3;
+    if(!dense) for(let k=iA;k<iB;k++) drawTri(R[k], C.r, false, Rok[k]!==false, 6);
+    const jA=lowerBound(P,t0-0.5), jB=lowerBound(P,t1+0.5);
+    if((jB-jA)<=L.plotW/3) for(let k=jA;k<jB;k++) drawTri(P[k], C.p, true, Pok[k]!==false, 5);
+    if(i===0 && RRs && winSec<=30){ ctx.fillStyle=css("--ink2"); ctx.font="10px system-ui,Arial";
+      for(let k=Math.max(1,iA);k<iB;k++){ const xm=(xOf(R[k-1],L)+xOf(R[k],L))/2; const f=RRs.flag[k-1]; ctx.fillStyle= f? C.muted:C.ink2; ctx.fillText(Math.round(RRs.ms[k-1])+(f?"*":""), xm-12, top+22); } }
+  });
+  // annotations (not dropouts)
+  ctx.fillStyle=css("--ink2"); ctx.font="10px system-ui,Arial";
+  for(const a of edf.annotations){ if(a.text.startsWith("Signal dropout")||a.onset<t0||a.onset>t1) continue; const X=xOf(a.onset,L); ctx.strokeStyle=css("--muted"); ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(X,L.padT); ctx.lineTo(X,L.H-L.padB); ctx.stroke(); ctx.setLineDash([]); ctx.fillText(a.text,X+3,L.padT+10); }
+  // caliper and zoom band
+  if(calPts.length){ ctx.strokeStyle=css("--warn"); ctx.setLineDash([4,3]); for(const t of calPts){ const X=xOf(t,L); ctx.beginPath(); ctx.moveTo(X,L.padT); ctx.lineTo(X,L.H-L.padB); ctx.stroke(); } ctx.setLineDash([]); }
+  if(drag && drag.x1!=null && Math.abs(drag.x1-drag.x0)>4){ ctx.fillStyle=css("--sel"); ctx.fillRect(Math.min(drag.x0,drag.x1),L.padT,Math.abs(drag.x1-drag.x0),L.H-L.padT-L.padB); }
+}
+function lowerBound(a,v){ let lo=0,hi=a.length; while(lo<hi){ const m=(lo+hi)>>1; if(a[m]<v) lo=m+1; else hi=m; } return lo; }
+
+function tachoLayout(){ return {W:tc.clientWidth, H:tc.clientHeight, padL:58, padR:12, padT:20, padB:22}; }
+function drawTacho(){
+  const L=tachoLayout(); tctx.clearRect(0,0,L.W,L.H); tctx.fillStyle=css("--panel"); tctx.fillRect(0,0,L.W,L.H);
+  tctx.fillStyle=css("--ink"); tctx.font="600 12px system-ui,Arial"; tctx.fillText("Tachogram",10,14);
+  if(!edf) return; const D=edf.duration, pw=L.W-L.padL-L.padR, ph=L.H-L.padT-L.padB, xT=t=>L.padL+t/D*pw;
+  tctx.fillStyle=css("--ink2"); tctx.font="11px system-ui,Arial"; tctx.fillText("interval (ms) · click to jump, drag to select an HRV range",88,14);
+  const all=[]; if(RRs) RRs.ms.forEach((v,i)=>{ if(RRs.valid[i]) all.push(v); }); if(PPs) PPs.ms.forEach((v,i)=>{ if(PPs.valid[i]) all.push(v); });
+  let lo=all.length? quantile(all,0.002):300, hi=all.length? quantile(all,0.998):1200; const m=(hi-lo)*0.12+5; lo=Math.max(0,lo-m); hi+=m;
+  const yV=v=>L.padT+ph-(v-lo)/(hi-lo)*ph;
+  tctx.strokeStyle=css("--grid"); tctx.lineWidth=1; const ticks=niceTicks(lo,hi,4);
+  for(const v of ticks){ const y=yV(v); tctx.beginPath(); tctx.moveTo(L.padL,y); tctx.lineTo(L.W-L.padR,y); tctx.stroke(); tctx.fillStyle=css("--ink2"); tctx.fillText(String(v),8,y+4); }
+  const ht=niceTimeStep(D); for(let t=Math.ceil(0/ht)*ht;t<=D;t+=ht){ tctx.fillStyle=css("--ink2"); tctx.fillText(fmtClock(t).slice(0, ht>=60?5:8), xT(t)-14, L.H-6); }
+  tctx.fillStyle=css("--bad"); for(const s of bad){ const a=xT(s[0]), b=xT(s[1]); if(b-a>0.5) tctx.fillRect(a,L.padT,b-a,ph); }
+  if(sel){ const a=xT(Math.min(sel[0],sel[1])), b=xT(Math.max(sel[0],sel[1])); tctx.fillStyle=css("--sel"); tctx.fillRect(a,L.padT,Math.max(1,b-a),ph); }
+  const muted=css("--muted");
+  const plot=(s,col)=>{ if(!s) return; for(let i=0;i<s.t.length;i++){ const v=s.ms[i]; if(v<lo||v>hi) continue; tctx.fillStyle = s.valid[i] ? col : muted; tctx.globalAlpha = s.valid[i]?0.85:0.5; tctx.fillRect(xT(s.t[i])-1, yV(v)-1, 2, 2); } tctx.globalAlpha=1; };
+  plot(PPs, css("--p")); plot(RRs, css("--r"));
+  const a=xT(t0), b=xT(t0+winSec); tctx.strokeStyle=css("--accent"); tctx.lineWidth=1.5; tctx.strokeRect(a,L.padT,Math.max(2,b-a),ph);
+}
+function niceTicks(lo,hi,n){ const span=hi-lo, raw=span/n, mag=Math.pow(10,Math.floor(Math.log10(raw))), st=[1,2,5,10].map(x=>x*mag).find(x=>span/x<=n)||10*mag; const out=[]; for(let v=Math.ceil(lo/st)*st; v<=hi; v+=st) out.push(Math.round(v)); return out; }
+function niceTimeStep(D){ return [10,30,60,300,600,900,1800,3600,7200,10800,21600].find(s=>D/s<=10)||21600; }
+
+/* ---------------------------------------------------------------------------- interaction */
+function clampT(t){ return Math.max(0, Math.min(Math.max(0,(edf?edf.duration:0)-winSec), t)); }
+function go(t){ t0=clampT(t); if(hrvRange==="view") updateHRV(); draw(); drawTacho(); }
+function setWin(w){ const c=t0+winSec/2; winSec=Math.max(0.2,w); const opts=[...$("win").options].map(o=>+o.value); let best=opts[0]; for(const o of opts) if(Math.abs(o-winSec)<Math.abs(best-winSec)) best=o; $("win").value=best; go(c-winSec/2); }
+$("win").onchange=()=>setWin(parseFloat($("win").value));
+$("bBack").onclick=()=>go(t0-winSec*0.5); $("bFwd").onclick=()=>go(t0+winSec*0.5);
+$("goto").addEventListener("keydown",e=>{ if(e.key!=="Enter"||!edf) return; const p=e.target.value.trim().split(":").map(Number); if(p.some(isNaN)) return;
+  const sec=p.reduce((a,v)=>a*60+v,0); const st=edf.start.getUTCHours()*3600+edf.start.getUTCMinutes()*60+edf.start.getUTCSeconds(); let rel=sec-st; if(rel<0) rel+=86400; go(rel-winSec/2); });
+for(const id of ["fOn","hp","lp","notch","base"]) $(id).addEventListener("change",()=>{ cache=null; draw(); });
+$("gUp").onclick=()=>{ autoGain=false; gainMul*=1.4; $("gAuto").classList.remove("on"); draw(); };
+$("gDn").onclick=()=>{ autoGain=false; gainMul/=1.4; $("gAuto").classList.remove("on"); draw(); };
+$("gAuto").onclick=()=>{ autoGain=true; gainMul=1; $("gAuto").classList.add("on"); draw(); };
+$("species").onchange=recompute; $("art").onchange=recompute; $("epochMin").onchange=()=>{};
+function setMode(m){ editMode = editMode===m ? null : m; $("mAdd").classList.toggle("on",editMode==="add"); $("mDel").classList.toggle("on",editMode==="del"); if(editMode){ caliper=false; $("bCal").classList.remove("on"); } setMsg(editMode ? (editMode==="add"?"Click to add a ":"Click to delete the nearest ")+$("editWhat").value+" mark (Esc to stop)" : ""); }
+$("mAdd").onclick=()=>setMode("add"); $("mDel").onclick=()=>setMode("del");
+$("bCal").onclick=()=>{ caliper=!caliper; calPts=[]; $("bCal").classList.toggle("on",caliper); if(caliper) setMode(null); $("calInfo").textContent=caliper?"Caliper: click two points":""; draw(); };
+$("bUndo").onclick=doUndo;
+$("bHelp").onclick=()=>$("help").classList.toggle("show"); $("bHelpClose").onclick=()=>$("help").classList.remove("show");
+$("bTheme").onclick=()=>{ const r=document.documentElement, dark = r.dataset.theme ? r.dataset.theme==="dark" : matchMedia("(prefers-color-scheme: dark)").matches; r.dataset.theme = dark ? "light" : "dark"; cache=null; draw(); drawTacho(); };
+function pushUndo(){ undo.push({R:R.slice(),Rok:Rok.slice(),Rconf:Rconf.slice(),P:P.slice(),Pok:Pok.slice(),bad:bad.map(s=>s.slice()),badP:badP.map(s=>s.slice()),src:marksSource}); if(undo.length>100) undo.shift(); }
+function doUndo(){ const u=undo.pop(); if(!u) return; R=u.R;Rok=u.Rok;Rconf=u.Rconf;P=u.P;Pok=u.Pok;bad=u.bad;badP=u.badP;marksSource=u.src; recompute(); draw(); setMsg("Undone"); }
+function snapPeak(t){ // largest absolute deflection within 40 ms on the first shown ECG lane (as displayed)
+  const L=layout(), W=windowData(L), ln=W.lanes.find(l=>ecg.includes(l.s)) || W.lanes[0]; if(!ln) return t;
+  const fs=ln.s.fs, k=Math.round(t*fs)-ln.k0, h=Math.round(0.04*fs); let bi=k, bv=-1, base=median(Array.from(ln.x).filter(isFinite));
+  for(let j=Math.max(0,k-h);j<Math.min(ln.x.length,k+h);j++){ const v=Math.abs(ln.x[j]-base); if(v>bv){ bv=v; bi=j; } }
+  return (ln.k0+bi)/fs; }
+function editAt(t, mode){
+  const what=$("editWhat").value, A = what==="R" ? R : P, OK = what==="R" ? Rok : Pok;
+  if(mode==="add"){ const tt=snapPeak(t); const i=lowerBound(A,tt); if((i<A.length && Math.abs(A[i]-tt)<0.03)||(i>0 && Math.abs(A[i-1]-tt)<0.03)) return; pushUndo(); A.splice(i,0,tt); OK.splice(i,0,true); if(what==="R") Rconf.splice(i,0,1); }
+  else { let i=lowerBound(A,t); if(i>=A.length || (i>0 && Math.abs(A[i-1]-t)<Math.abs(A[i]-t))) i--; if(i<0 || Math.abs(A[i]-t)>0.15) return; pushUndo(); A.splice(i,1); OK.splice(i,1); if(what==="R") Rconf.splice(i,1); }
+  if(!/edited/.test(marksSource)) marksSource=(marksSource||"manual")+", edited"; recompute(); draw(); }
+const tAtX=x=>{ const L=layout(); return t0+(x-L.padL)/L.plotW*winSec; };
+cv.addEventListener("mousedown",e=>{ if(!edf||e.button!==0) return; const x=e.offsetX; if(editMode||caliper){ drag=null; return; } drag={x0:x,x1:null}; });
+cv.addEventListener("mousemove",e=>{ if(!edf) return; const t=tAtX(e.offsetX); $("cursor").innerHTML=`<b>${fmtClock(t,true)}</b> &nbsp;t = ${t.toFixed(3)} s`; if(drag){ drag.x1=e.offsetX; draw(); } });
+window.addEventListener("mouseup",e=>{ if(!drag) return; const d=drag; drag=null; if(d.x1!=null && Math.abs(d.x1-d.x0)>6){ const a=tAtX(Math.min(d.x0,d.x1)), b=tAtX(Math.max(d.x0,d.x1)); winSec=Math.max(0.2,b-a); setWin(winSec); go(a); } else draw(); });
+cv.addEventListener("click",e=>{ if(!edf) return; const t=tAtX(e.offsetX);
+  if(editMode){ editAt(t, editMode); return; }
+  if(caliper){ calPts.push(t); if(calPts.length>2) calPts=[t]; if(calPts.length===2){ const dt=Math.abs(calPts[1]-calPts[0]); $("calInfo").innerHTML=`Δt <b>${(dt*1000).toFixed(1)} ms</b> · ${(60/dt).toFixed(1)} /min`; } else $("calInfo").textContent="Caliper: click the second point"; draw(); } });
+cv.addEventListener("contextmenu",e=>{ if(!edf) return; e.preventDefault(); editAt(tAtX(e.offsetX),"del"); });
+cv.addEventListener("wheel",e=>{ if(!edf) return; e.preventDefault(); if(e.ctrlKey||e.metaKey){ const t=tAtX(e.offsetX), f=e.deltaY>0?1.25:0.8, nw=Math.max(0.2,Math.min(edf.duration,winSec*f)); t0=t-(t-t0)*nw/winSec; winSec=nw; setWin(nw); } else go(t0+(e.deltaY+e.deltaX)/600*winSec); },{passive:false});
+tc.addEventListener("mousedown",e=>{ if(!edf) return; const L=tachoLayout(), t=(e.offsetX-L.padL)/(L.W-L.padL-L.padR)*edf.duration; tdrag={t0:t,moved:false}; });
+tc.addEventListener("mousemove",e=>{ if(!tdrag) return; const L=tachoLayout(), t=Math.max(0,Math.min(edf.duration,(e.offsetX-L.padL)/(L.W-L.padL-L.padR)*edf.duration)); if(Math.abs(t-tdrag.t0)>edf.duration/400){ tdrag.moved=true; sel=[tdrag.t0,t]; drawTacho(); } });
+window.addEventListener("mouseup",()=>{ if(!tdrag) return; const d=tdrag; tdrag=null; if(d.moved){ hrvRange="sel"; updateHRV(); drawTacho(); } else go(d.t0-winSec/2); });
+tc.addEventListener("dblclick",()=>{ sel=null; if(hrvRange==="sel") hrvRange="file"; updateHRV(); drawTacho(); });
+window.addEventListener("keydown",e=>{ if(!edf || e.target.tagName==="INPUT" || e.target.tagName==="SELECT") return;
+  if(e.key==="ArrowLeft"){ go(t0-winSec*(e.shiftKey?1:0.5)); e.preventDefault(); }
+  else if(e.key==="ArrowRight"){ go(t0+winSec*(e.shiftKey?1:0.5)); e.preventDefault(); }
+  else if(e.key==="+"||e.key==="="){ setWin(winSec/1.5); } else if(e.key==="-"||e.key==="_"){ setWin(winSec*1.5); }
+  else if(e.key==="a"||e.key==="A"){ setMode("add"); } else if(e.key==="d"||e.key==="D"){ setMode("del"); }
+  else if(e.key==="c"||e.key==="C"){ $("bCal").click(); } else if(e.key==="Escape"){ setMode(null); if(caliper) $("bCal").click(); }
+  else if((e.ctrlKey||e.metaKey) && (e.key==="z"||e.key==="Z")){ doUndo(); e.preventDefault(); } });
+
+/* -------------------------------------------------------------------------------- export */
+$("bExport").onclick=e=>{ const m=$("menu"), r=e.target.getBoundingClientRect(), w=$("wrap").getBoundingClientRect(); m.style.display = m.style.display==="flex" ? "none":"flex"; m.style.right="12px"; m.style.top="4px"; };
+document.addEventListener("click",e=>{ if(!e.target.closest("#menu") && e.target.id!=="bExport") $("menu").style.display="none"; });
+$("menu").addEventListener("click",e=>{ const x=e.target.dataset.x; if(!x) return; $("menu").style.display="none"; if(!edf){ setMsg("Open a file first."); return; } try{ EXPORTS[x](); } catch(err){ console.error(err); setMsg("Export failed: "+err.message); } });
+const stem=()=>fileName.replace(/\.edf$/i,"");
+function download(name, text, type){ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([text],{type:type||"text/csv"})); a.download=name; document.body.appendChild(a); a.click(); a.remove(); }
+const num=(v,d)=> (v===undefined||v===null||!isFinite(v)) ? "" : (+v).toFixed(d);
+function hrvKeys(o){ return Object.keys(o).filter(k=>!k.startsWith("_")); }
+const EXPORTS={
+  beats(){ if(!R.length) throw new Error("no beats"); let s="beat,time_s,datetime,rr_ms,rr_flag,hr_bpm,confidence,good\n";
+    R.forEach((t,i)=>{ const rr= i>0 && RRs ? RRs.ms[i-1] : NaN, f= i>0 && RRs ? RRs.flag[i-1] : "first";
+      s+=`${i},${t.toFixed(4)},${fmtDate(t)},${num(rr,1)},${f},${num(60000/rr,2)},${num(Rconf[i],3)},${Rok[i]===false?0:1}\n`; });
+    download(stem()+"_beats.csv", s); },
+  pw(){ if(!P.length) throw new Error("no P waves (import marks from teleep analyze)"); let s="p,time_s,datetime,pp_ms,pp_flag,rate_per_min\n";
+    P.forEach((t,i)=>{ const pp=i>0&&PPs?PPs.ms[i-1]:NaN, f=i>0&&PPs?PPs.flag[i-1]:"first"; s+=`${i},${t.toFixed(4)},${fmtDate(t)},${num(pp,1)},${f},${num(60000/pp,2)}\n`; });
+    download(stem()+"_pwaves.csv", s); },
+  hrv(){ if(!lastHRV) throw new Error("no HRV"); const series=Object.keys(lastHRV.res), keys=hrvKeys(lastHRV.res.RR);
+    let s="metric,"+series.join(",")+"\n"; s+=`range_start,${series.map(()=>fmtDate(lastHRV.range[0])).join(",")}\nrange_end,${series.map(()=>fmtDate(lastHRV.range[1])).join(",")}\n`;
+    for(const k of keys) s+=`${k},${series.map(c=>num(lastHRV.res[c][k],6)).join(",")}\n`;
+    s+=`species,${series.map(()=>$("species").value).join(",")}\nartifact_threshold_pct,${series.map(()=>$("art").value).join(",")}\nbeats,${series.map(()=>JSON.stringify(marksSource)).join(",")}\n`;
+    download(stem()+"_hrv.csv", s); },
+  epochs(){ if(!RRs) throw new Error("no beats"); const ep=(parseFloat($("epochMin").value)||5)*60, pr=preset(), rows=[];
+    const into=(edf.start.getUTCHours()*3600+edf.start.getUTCMinutes()*60+edf.start.getUTCSeconds()+edf.start.getUTCMilliseconds()/1000)%ep, first=(ep-into)%ep, bounds=[]; if(first>0) bounds.push([0,first]);
+    for(let t=first;t<edf.duration-1e-9;t+=ep) bounds.push([t,Math.min(edf.duration,t+ep)]);
+    for(const [a,b] of bounds){ if(b-a<0.8*ep) continue; for(const [name,S] of [["RR",RRs],["PP",PPs]]){ if(!S) continue; const w=sliceSeries(S,a,b); let cov=0; w.ms.forEach((v,i)=>{ if(w.flag[i]!=="gap" && w.flag[i]!=="beat") cov+=v; }); cov=cov/1000/ep;
+      const nv=w.valid.filter(Boolean).length, vf=w.ms.length? nv/w.ms.length : 0, row={series:name, epoch_start:fmtDate(a), epoch_start_s:a, coverage:cov, analyzed:(cov>=0.8 && vf>=0.7 && nv>=10)?1:0};
+      if(row.analyzed) Object.assign(row, hrvAll(w,pr)); else Object.assign(row,{n_intervals:w.ms.length, n_nn:nv}); rows.push(row); } }
+    const keys=[]; rows.forEach(r=>hrvKeys(r).forEach(k=>{ if(!keys.includes(k)) keys.push(k); }));
+    let s=keys.join(",")+"\n"; for(const r of rows) s+=keys.map(k=> typeof r[k]==="string" ? r[k] : Number.isInteger(r[k]) ? String(r[k]) : num(r[k],6)).join(",")+"\n"; download(stem()+"_hrv_epochs.csv", s); },
+  signal(){ const L=layout(), W=windowData(L); if(!W.lanes.length) throw new Error("no signal shown"); const fs=W.lanes[0].s.fs, lanes=W.lanes.filter(l=>l.s.fs===fs);
+    let s="time_s,datetime,"+lanes.map(l=>`${l.s.label} (${l.s.unit})`).join(",")+"\n"; const n=Math.min(...lanes.map(l=>l.x.length));
+    for(let k=0;k<n;k++){ const t=(lanes[0].k0+k)/fs; if(t>t0+winSec) break; s+=`${t.toFixed(4)},${fmtDate(t)},`+lanes.map(l=>num(l.x[k],6)).join(",")+"\n"; }
+    download(`${stem()}_signal_${fmtClock(t0).replace(/:/g,"")}.csv`, s); },
+  marks(){ const o={format:"teleep-marks-1", software:"TeleEP Viewer", file:fileName, qrs:R.map(v=>+v.toFixed(4)), qrs_conf:Rconf.map(v=>+(+v).toFixed(3)), qrs_good:Rok.map(v=>v===false?0:1), qrs_morph:R.map(()=>0), p:P.map(v=>+v.toFixed(4)), p_good:Pok.map(v=>v===false?0:1), t_end:R.map(()=>null), bad:bad, bad_p:badP};
+    download(stem()+".marks.json", JSON.stringify(o), "application/json"); },
+  png(){ const a=document.createElement("a"); a.href=cv.toDataURL("image/png"); a.download=`${stem()}_${fmtClock(t0).replace(/:/g,"")}.png`; a.click(); },
+  tpng(){ const a=document.createElement("a"); a.href=tc.toDataURL("image/png"); a.download=`${stem()}_tachogram.png`; a.click(); },
+};
+// test hook (used by the automated tests)
+window.TeleEP = {parseEDF, readSignal, detectR, buildIntervals, hrvAll, timeDomain, welchPSD, importMarks, loadEDF, state:()=>({R,P,RRs,PPs,bad,lastHRV,edf})};
+fit();
+</script>
+</body>
+</html>

@@ -1,0 +1,201 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>EP Annotator</title>
+<style>
+:root{--bg:#0f1115;--panel:#1a1d24;--ink:#e7eaf0;--muted:#9aa3b2;--accent:#4ea1ff;--grid:#262b36;}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:13px/1.4 system-ui,Segoe UI,Roboto,Arial,sans-serif}
+#app{display:flex;flex-direction:column;height:100%}
+.bar{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:6px 10px;background:var(--panel);border-bottom:1px solid #000}
+.g{display:flex;gap:4px;align-items:center}.bar label{color:var(--muted)}
+button,select,input[type=text]{background:#262b34;color:var(--ink);border:1px solid #3a4150;border-radius:6px;padding:4px 8px;font:inherit;cursor:pointer}
+button:hover{background:#2f3640}button.on{background:var(--accent);border-color:var(--accent);color:#04122a}
+button.q{border-color:#ff5d6c}button.p{border-color:#46c3ff}button.d{border-color:#ffae42}button.ok{background:#2a7d46;border-color:#2a7d46}
+.sep{width:1px;height:22px;background:#3a4150}
+#wrap{flex:1;position:relative;overflow:hidden}canvas{display:block;width:100%;height:100%;cursor:crosshair}
+#status{padding:5px 10px;background:var(--panel);border-top:1px solid #000;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;min-height:28px}
+#status b{color:var(--ink)}.pill{background:#262b34;border:1px solid #3a4150;border-radius:20px;padding:1px 9px}
+kbd{background:#2b313c;border:1px solid #3a4150;border-radius:4px;padding:0 4px;font-size:11px}
+#help{position:absolute;right:10px;top:8px;background:rgba(26,29,36,.95);border:1px solid #3a4150;border-radius:8px;padding:10px 12px;max-width:420px;display:none;z-index:5}
+#help.show{display:block}
+</style></head><body><div id="app">
+<div class="bar">
+ <div class="g"><label>Folder</label><input type="text" id="folder" style="width:230px" title="Folder that contains the EDF files; type a path and press Enter"></div>
+ <div class="g"><label>EDF</label><select id="file"></select><label>Leads</label><select id="leads" title="Which ECG leads the detector uses"><option value="" selected>all (fused)</option><option value="0">ECG 1 only</option><option value="1">ECG 2 only</option><option value="2">ECG 3 only</option><option value="1,2">ECG 2 + 3</option></select><button id="analyze" class="ok">Detect</button></div>
+ <div class="g"><label>Window</label><select id="win"><option value="4">4 s</option><option value="8" selected>8 s</option><option value="15">15 s</option><option value="30">30 s</option><option value="60">60 s</option></select>
+  <button id="back">⟨</button><input type="range" id="scrub" min="0" max="1000" value="0" style="width:260px"><button id="fwd">⟩</button></div>
+ <div class="g"><label>Display</label><select id="display"><option value="base" selected>Baseline removed</option><option value="raw">Raw</option><option value="band">5-40 Hz</option></select>
+  <label>Gain</label><button id="gDn">−</button><button id="gUp">+</button></div>
+ <div class="g"><label>Go to</label><input type="text" id="goto" placeholder="mm:ss or s" style="width:70px"><button id="next-low">next low-conf</button><button id="next-rev">next review item</button><button id="next-unrev">next unreviewed</button></div>
+ <div class="g"><button id="avgbtn">Average beat / T wave</button><button id="helpbtn">?</button></div>
+</div>
+<div class="bar">
+ <div class="g"><label>Edit</label>
+  <button id="m-q" class="q">Add QRS <kbd>Q</kbd></button><button id="m-p" class="p">Add P <kbd>P</kbd></button><button id="m-d" class="d">Delete <kbd>D</kbd></button><button id="m-x">Toggle P↔QRS <kbd>X</kbd></button><button id="undo">Undo <kbd>Z</kbd></button></div>
+ <div class="sep"></div>
+ <div class="g"><button id="rev" class="ok">Mark window REVIEWED <kbd>R</kbd></button><button id="unrev">Un-review <kbd>U</kbd></button><button id="save">Save <kbd>S</kbd></button><span class="pill" id="saveinfo"></span></div>
+</div>
+<div id="wrap"><canvas id="cv"></canvas>
+ <div id="avg" style="position:absolute;left:70px;bottom:30px;width:760px;height:340px;background:rgba(26,29,36,.96);border:1px solid #3a4150;border-radius:8px;display:none;z-index:4"><canvas id="avgcv" style="width:100%;height:100%;cursor:default"></canvas></div>
+ <div id="help"><b>How to use</b><br>1. Pick an EDF and press <b>Detect</b> (5 to 10 s per hour of data; results are cached).<br>
+ 2. Step through the recording (<kbd>←</kbd>/<kbd>→</kbd> half a window, <kbd>Shift</kbd>+arrows a full window, <kbd>+</kbd>/<kbd>-</kbd> zoom).<br>
+ 3. Fix marks: press <kbd>Q</kbd> or <kbd>P</kbd> then click on the deflection (the mark snaps to the nearest detected deflection); <kbd>D</kbd> + click deletes the nearest mark; <kbd>X</kbd> + click flips a P into a QRS or back. <kbd>Esc</kbd> leaves edit mode.<br>
+ 4. When every P and QRS in the window is right, press <kbd>R</kbd>. Only REVIEWED stretches (green band) are used for training, so mark even windows that needed no change.<br>
+ 5. <kbd>S</kbd> saves to <i>annotations/&lt;edf&gt;.corrections.json</i>. Then run <i>train.py</i>.<br>
+ Marks: ▼ QRS (colour = morphology, ring = added by you, hollow = low confidence), ▲ P, | T end. Grey = unanalyzable signal, orange ticks on the top edge = detector's own "please check" items.</div>
+</div>
+<div id="status"><span id="info">Choose an EDF and press Detect.</span><span class="pill" id="hover"></span><span class="pill" id="counts"></span></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const cv=$("cv"),ctx=cv.getContext("2d");
+let M=null,SEG=null,t0=0,winSec=8,gain=1,mode=null,display="base";
+let QRS=[],P=[],REV=[],LOG=[],dirty=false,hoverT=null;
+const MORPH=["#ff5d6c","#ffd166","#c77dff","#06d6a0","#f78c6b"];
+const api=(u)=>fetch(u).then(r=>r.json());
+function fmt(s){s=Math.max(0,s);const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),x=s%60;return (h?h+":":"")+String(m).padStart(2,"0")+":"+(winSec<=15?x.toFixed(2):String(Math.floor(x)).padStart(2,"0")).padStart(winSec<=15?5:2,"0");}
+function clock(s){if(!M)return"";const d=new Date(M.start);d.setMilliseconds(d.getMilliseconds()+s*1000);return d.toTimeString().slice(0,8);}
+
+async function loadFiles(){let r;try{r=await api("/files");}catch(e){$("info").innerHTML="<b>Cannot reach the EP Annotator server.</b> Start it with <i>Start EP Annotator.command</i> (or <code>python3 annotator/app.py \"&lt;EDF folder&gt;\"</code>) and open http://127.0.0.1:8765; this page does not work when opened as a file.";return;}
+ const sel=$("file");sel.innerHTML="";const o0=document.createElement("option");o0.value="";o0.textContent=r.files.length?"choose an EDF":"(no EDF files in this folder)";sel.appendChild(o0);
+ r.files.forEach(f=>{const o=document.createElement("option");o.value=f;o.textContent=(r.annotated.includes(f.replace(/\.edf$/i,""))?"✔ ":"")+f;sel.appendChild(o);});
+ $("folder").value=r.folder;
+ $("info").innerHTML=r.files.length?`Folder <b>${r.folder}</b> · ${r.files.length} EDF files · ${r.annotated.length} with corrections${r.model?" · <b>supervised model active</b>":""}. Choose an EDF, then press Detect`
+  :`<b>No .edf files found in ${r.folder}.</b> Type the folder that contains the EDF files in the Folder box (e.g. .../pig DSI data/08062023 P10/sample EDFs) and press Enter.`;}
+$("folder").addEventListener("keydown",async e=>{if(e.key!=="Enter")return;const r=await fetch("/folder",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({path:$("folder").value})}).then(r=>r.json());
+ if(r.error){$("info").textContent="Folder error: "+r.error;return;}M=null;SEG=null;await loadFiles();draw();});
+async function analyze(){const f=$("file").value;if(!f){$("info").textContent="Choose an EDF in the list first.";return;}$("info").textContent="Detecting P / QRS / T in "+f+" …";$("analyze").disabled=true;
+ try{M=await api("/analyze?file="+encodeURIComponent(f)+"&leads="+encodeURIComponent($("leads").value));
+  QRS=M.qrs.map((t,i)=>({t,morph:M.qrs_morph[i],conf:M.qrs_conf[i],src:"auto",tend:M.t_end[i],tpeak:M.t_peak?M.t_peak[i]:null}));
+  P=M.p.map((t,i)=>({t,ncc:M.p_ncc[i],src:"auto"}));REV=[];LOG=[];dirty=false;
+  const C=await api("/corrections?file="+encodeURIComponent(f));
+  if(C&&C.qrs){QRS=C.qrs.map((t,i)=>({t,morph:C.qrs_morph?C.qrs_morph[i]:0,conf:C.qrs_conf?C.qrs_conf[i]:1,src:C.qrs_src?C.qrs_src[i]:"auto",tend:null}));
+   // keep detector T ends where the QRS is unchanged
+   QRS.forEach(q=>{const j=M.qrs.findIndex(v=>Math.abs(v-q.t)<0.02);if(j>=0){q.tend=M.t_end[j];q.tpeak=M.t_peak?M.t_peak[j]:null;}});
+   P=C.p.map((t,i)=>({t,src:C.p_src?C.p_src[i]:"auto"}));REV=C.reviewed||[];LOG=C.log||[];
+   $("saveinfo").textContent="loaded corrections saved "+(C.saved||"");}
+  else $("saveinfo").textContent="";
+  $("info").innerHTML=`<b>${f}</b> · ${M.duration.toFixed(0)} s from ${clock(0)} · ${M.n_morph} QRS morphologies · detection ${M.elapsed}s · leads used: ${M.leads_used.map(i=>"ECG "+(i+1)).join(", ")}`;
+  t0=0;fitCanvas();await refresh();}
+ catch(e){$("info").textContent="Error: "+e;}
+ $("analyze").disabled=false;}
+async function refresh(){if(!M)return;SEG=await api(`/segment?t0=${t0}&dur=${winSec}&display=${display}`);updateScrub();draw();}
+function clampT(t){return Math.min(Math.max(0,t),Math.max(0,(M?M.duration:0)-winSec));}
+function updateScrub(){const mx=Math.max(0,M.duration-winSec);$("scrub").value=mx>0?Math.round(t0/mx*1000):0;}
+function fitCanvas(){const r=cv.parentElement.getBoundingClientRect(),dpr=window.devicePixelRatio||1;cv.width=r.width*dpr;cv.height=r.height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);draw();}
+window.addEventListener("resize",fitCanvas);
+function layout(){const W=cv.clientWidth,H=cv.clientHeight,padL=60,padR=10,padT=26,padB=22;const n=SEG?SEG.y.length:1;return{W,H,padL,padR,padT,padB,laneH:(H-padT-padB)/n,plotW:W-padL-padR};}
+const X=(L,t)=>L.padL+(t-t0)/winSec*L.plotW;
+
+function draw(){const L=layout();ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,cv.width,cv.height);ctx.restore();if(!M||!SEG)return;const t1=t0+winSec;
+ // unanalyzable + reviewed bands
+ ctx.fillStyle="rgba(150,150,150,0.13)";for(const [a,b] of M.bad){if(b<t0||a>t1)continue;ctx.fillRect(X(L,Math.max(a,t0)),L.padT,X(L,Math.min(b,t1))-X(L,Math.max(a,t0)),L.H-L.padT-L.padB);}
+ for(const [a,b] of REV){if(b<t0||a>t1)continue;ctx.fillStyle="rgba(46,204,113,0.25)";ctx.fillRect(X(L,Math.max(a,t0)),0,X(L,Math.min(b,t1))-X(L,Math.max(a,t0)),8);ctx.fillStyle="rgba(46,204,113,0.05)";ctx.fillRect(X(L,Math.max(a,t0)),L.padT,X(L,Math.min(b,t1))-X(L,Math.max(a,t0)),L.H-L.padT-L.padB);}
+ // review items
+ ctx.fillStyle="#ffae42";for(const [t,why] of M.review){if(t<t0||t>t1)continue;ctx.fillRect(X(L,t)-1,10,3,10);}
+ // grid
+ ctx.strokeStyle="#262b36";ctx.lineWidth=1;const stepS=winSec<=8?0.2:winSec<=15?0.5:winSec<=30?1:5;
+ for(let s=Math.ceil(t0/stepS)*stepS;s<=t1;s+=stepS){const x=X(L,s);ctx.globalAlpha=(Math.abs(s/ (stepS*5)-Math.round(s/(stepS*5)))<1e-6)?1:0.45;ctx.beginPath();ctx.moveTo(x,L.padT);ctx.lineTo(x,L.H-L.padB);ctx.stroke();}
+ ctx.globalAlpha=1;ctx.fillStyle="#9aa3b2";ctx.font="11px system-ui";ctx.textAlign="center";
+ for(let s=Math.ceil(t0);s<=t1;s+=(winSec<=15?1:winSec<=30?2:5)){ctx.fillText(fmt(s),X(L,s),L.H-7);}
+ // traces
+ SEG.y.forEach((y,li)=>{const yTop=L.padT+li*L.laneH,yMid=yTop+L.laneH/2;
+  let sc=0;for(let i=0;i<y.length;i+=Math.max(1,(y.length/2000)|0))sc=Math.max(sc,Math.abs(y[i]));sc=Math.max(sc,0.05);
+  const k=(L.laneH*0.42)/sc*gain;
+  ctx.strokeStyle=li===0?"#7fb2ff":li===1?"#e7eaf0":"#8fe388";ctx.globalAlpha=M.leads_used.includes(li)?1:0.35;ctx.lineWidth=1;ctx.beginPath();
+  for(let i=0;i<y.length;i++){const x=X(L,SEG.t[i]),yy=yMid-y[i]*k;i?ctx.lineTo(x,yy):ctx.moveTo(x,yy);}ctx.stroke();ctx.globalAlpha=1;
+  ctx.fillStyle="#9aa3b2";ctx.textAlign="left";ctx.fillText((M.labels[li]||"ECG")+" "+(li+1)+(M.leads_used.includes(li)?"":"  (not used)"),6,yTop+12);
+  // 0.1 mV scale bar
+  ctx.strokeStyle="#9aa3b2";ctx.beginPath();ctx.moveTo(L.padL-8,yMid);ctx.lineTo(L.padL-8,yMid-0.1*k);ctx.stroke();ctx.fillText("0.1 mV",4,yMid-0.1*k-3);
+  if(li===(M.leads_used?M.leads_used[0]:0)){
+   // QRS marks
+   for(const q of QRS){if(q.t<t0||q.t>t1)continue;const x=X(L,q.t),yv=yMid-valAt(li,q.t)*k;ctx.fillStyle=MORPH[q.morph%MORPH.length];ctx.strokeStyle=ctx.fillStyle;
+    tri(x,yv-14,7,true,q.conf>=0.8);if(q.src==="user"){ctx.strokeStyle="#fff";ctx.beginPath();ctx.arc(x,yv-14,9,0,7);ctx.stroke();}
+    if(q.tend!=null&&q.tend<=t1){ctx.strokeStyle="#2ecc71";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(X(L,q.tend),yMid-10);ctx.lineTo(X(L,q.tend),yMid+10);ctx.stroke();ctx.lineWidth=1;}
+    if(q.tpeak!=null&&q.tpeak<=t1){ctx.strokeStyle="#2ecc71";ctx.beginPath();ctx.arc(X(L,q.tpeak),yMid-valAt(li,q.tpeak)*k,5,0,7);ctx.stroke();}}
+   for(const p of P){if(p.t<t0||p.t>t1)continue;const x=X(L,p.t),yv=yMid-valAt(li,p.t)*k;ctx.fillStyle="#46c3ff";ctx.strokeStyle="#46c3ff";tri(x,yv+14,6,false,true);
+    if(p.src==="user"){ctx.strokeStyle="#fff";ctx.beginPath();ctx.arc(x,yv+14,8,0,7);ctx.stroke();}}
+  }
+  // RR / PP labels along lane 1
+  if(li===1){ctx.fillStyle="#ff9aa5";ctx.textAlign="center";const qs=QRS.filter(q=>q.t>=t0-2&&q.t<=t1);for(let i=1;i<qs.length;i++){const mid=(qs[i].t+qs[i-1].t)/2;if(mid<t0||mid>t1)continue;ctx.fillText(Math.round((qs[i].t-qs[i-1].t)*1000),X(L,mid),yTop+12);}
+   ctx.fillStyle="#7fd0ff";const ps=P.filter(p=>p.t>=t0-2&&p.t<=t1);for(let i=1;i<ps.length;i++){const mid=(ps[i].t+ps[i-1].t)/2;if(mid<t0||mid>t1||winSec>30)continue;ctx.fillText(Math.round((ps[i].t-ps[i-1].t)*1000),X(L,mid),yTop+L.laneH-4);}}
+ });
+ if(hoverT!=null){ctx.strokeStyle="rgba(255,255,255,0.25)";ctx.beginPath();ctx.moveTo(X(L,hoverT),L.padT);ctx.lineTo(X(L,hoverT),L.H-L.padB);ctx.stroke();}
+ $("counts").innerHTML=`window: <b>${QRS.filter(q=>q.t>=t0&&q.t<=t1).length}</b> QRS · <b>${P.filter(p=>p.t>=t0&&p.t<=t1).length}</b> P · file: ${QRS.length} QRS, ${P.length} P, reviewed ${REV.reduce((s,[a,b])=>s+b-a,0).toFixed(0)} s${dirty?" · <b>unsaved</b>":""}`;
+}
+function tri(x,y,r,down,filled){ctx.beginPath();if(down){ctx.moveTo(x-r,y-r);ctx.lineTo(x+r,y-r);ctx.lineTo(x,y+r);}else{ctx.moveTo(x-r,y+r);ctx.lineTo(x+r,y+r);ctx.lineTo(x,y-r);}ctx.closePath();filled?ctx.fill():ctx.stroke();}
+function valAt(li,t){if(!SEG)return 0;const i=Math.round((t-SEG.t0)*SEG.fs/SEG.step);const y=SEG.y[li];if(i<0||i>=y.length)return 0;let m=y[i];for(let j=Math.max(0,i-3);j<Math.min(y.length,i+4);j++)if(Math.abs(y[j])>Math.abs(m))m=y[j];return m;}
+
+// ---- editing ----
+function setMode(m){mode=(mode===m)?null:m;["q","p","d","x"].forEach(k=>$("m-"+k).classList.toggle("on",mode===k));}
+function snap(t){let best=null,bd=0.08;for(const c of M.cand){const d=Math.abs(c-t);if(d<bd){bd=d;best=c;}}return best!=null?best:Math.round(t*M.fs)/M.fs;}
+function nearest(t){let best=null,bd=0.12;QRS.forEach((q,i)=>{const d=Math.abs(q.t-t);if(d<bd){bd=d;best={type:"qrs",i,d};}});P.forEach((p,i)=>{const d=Math.abs(p.t-t);if(d<bd){bd=d;best={type:"p",i,d};}});return best;}
+function act(a){LOG.push(a);dirty=true;}
+function addQRS(t){const s=snap(t);if(QRS.some(q=>Math.abs(q.t-s)<0.06))return;QRS.push({t:s,morph:0,conf:1,src:"user",tend:null});QRS.sort((a,b)=>a.t-b.t);act({op:"add",type:"qrs",t:s});}
+function addP(t){const s=snap(t);if(P.some(p=>Math.abs(p.t-s)<0.06))return;P.push({t:s,src:"user"});P.sort((a,b)=>a.t-b.t);act({op:"add",type:"p",t:s});}
+function del(t){const n=nearest(t);if(!n)return;if(n.type==="qrs"){const q=QRS.splice(n.i,1)[0];act({op:"del",type:"qrs",t:q.t,was:q});}else{const p=P.splice(n.i,1)[0];act({op:"del",type:"p",t:p.t,was:p});}}
+function toggle(t){const n=nearest(t);if(!n)return;if(n.type==="qrs"){const q=QRS.splice(n.i,1)[0];P.push({t:q.t,src:"user"});P.sort((a,b)=>a.t-b.t);act({op:"toggle",from:"qrs",t:q.t,was:q});}else{const p=P.splice(n.i,1)[0];QRS.push({t:p.t,morph:0,conf:1,src:"user",tend:null});QRS.sort((a,b)=>a.t-b.t);act({op:"toggle",from:"p",t:p.t,was:p});}}
+function undo(){const a=LOG.pop();if(!a)return;dirty=true;
+ if(a.op==="add"){if(a.type==="qrs")QRS=QRS.filter(q=>q.t!==a.t);else P=P.filter(p=>p.t!==a.t);}
+ else if(a.op==="del"){if(a.type==="qrs"){QRS.push(a.was);QRS.sort((x,y)=>x.t-y.t);}else{P.push(a.was);P.sort((x,y)=>x.t-y.t);}}
+ else if(a.op==="toggle"){if(a.from==="qrs"){P=P.filter(p=>p.t!==a.t);QRS.push(a.was);QRS.sort((x,y)=>x.t-y.t);}else{QRS=QRS.filter(q=>q.t!==a.t);P.push(a.was);P.sort((x,y)=>x.t-y.t);}}
+ else if(a.op==="review"){REV=a.before;}
+ draw();}
+function markReviewed(on){const before=REV.map(r=>r.slice());const a=t0,b=Math.min(M.duration,t0+winSec);
+ if(on){REV.push([a,b]);}else{REV=REV.flatMap(([x,y])=>{if(y<=a||x>=b)return[[x,y]];const out=[];if(x<a)out.push([x,a]);if(y>b)out.push([b,y]);return out;});}
+ REV.sort((p,q)=>p[0]-q[0]);const m=[];for(const r of REV){if(m.length&&r[0]<=m[m.length-1][1]+1e-6)m[m.length-1][1]=Math.max(m[m.length-1][1],r[1]);else m.push(r.slice());}REV=m;
+ act({op:"review",on,a,b,before});draw();}
+async function save(){if(!M)return;const body={file:M.file,fs:M.fs,duration:M.duration,reviewed:REV,qrs:QRS.map(q=>q.t),qrs_morph:QRS.map(q=>q.morph),qrs_conf:QRS.map(q=>q.conf),qrs_src:QRS.map(q=>q.src),p:P.map(p=>p.t),p_src:P.map(p=>p.src),log:LOG,
+  detector:{qrs:M.qrs,p:M.p}};
+ const r=await fetch("/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(r=>r.json());
+ if(r.ok){dirty=false;$("saveinfo").textContent="saved "+new Date().toTimeString().slice(0,8)+" → "+r.path.split("/").slice(-2).join("/");loadFiles();$("file").value=M.file;draw();}else $("saveinfo").textContent="save failed: "+r.error;}
+
+// ---- navigation ----
+async function go(t){t0=clampT(t);await refresh();}
+function nextWhere(pred,from){for(const t of pred())if(t>from+0.01)return t;return null;}
+$("next-low").onclick=()=>{const t=nextWhere(()=>QRS.filter(q=>q.conf<0.8).map(q=>q.t),t0+winSec/2);if(t!=null)go(t-winSec/2);else $("hover").textContent="no more low-confidence QRS";};
+$("next-rev").onclick=()=>{const t=nextWhere(()=>M.review.map(r=>r[0]),t0+winSec/2);if(t!=null)go(t-winSec/2);else $("hover").textContent="no more review items";};
+$("next-unrev").onclick=()=>{let t=t0+winSec;while(t<M.duration){if(!REV.some(([a,b])=>t>=a&&t+winSec<=b))break;t+=winSec;}go(t);};
+$("goto").addEventListener("keydown",e=>{if(e.key==="Enter"){const v=$("goto").value.trim();const parts=v.split(":").map(Number);const s=parts.length===2?parts[0]*60+parts[1]:parts.length===3?parts[0]*3600+parts[1]*60+parts[2]:Number(v);if(!isNaN(s))go(s);e.target.blur();}});
+$("file").onchange=analyze;$("leads").onchange=analyze;$("analyze").onclick=analyze;
+$("win").onchange=()=>{const c=t0+winSec/2;winSec=parseFloat($("win").value);go(c-winSec/2);};
+$("display").onchange=()=>{display=$("display").value;refresh();};
+$("gUp").onclick=()=>{gain*=1.3;draw();};$("gDn").onclick=()=>{gain/=1.3;draw();};
+$("back").onclick=()=>go(t0-winSec/2);$("fwd").onclick=()=>go(t0+winSec/2);
+$("scrub").addEventListener("input",()=>{t0=clampT($("scrub").value/1000*Math.max(0,M.duration-winSec));draw();});
+$("scrub").addEventListener("change",refresh);
+$("m-q").onclick=()=>setMode("q");$("m-p").onclick=()=>setMode("p");$("m-d").onclick=()=>setMode("d");$("m-x").onclick=()=>setMode("x");
+$("undo").onclick=undo;$("rev").onclick=()=>markReviewed(true);$("unrev").onclick=()=>markReviewed(false);$("save").onclick=save;
+$("helpbtn").onclick=()=>$("help").classList.toggle("show");
+let AVG=null;
+$("avgbtn").onclick=async()=>{const d=$("avg");if(d.style.display==="block"){d.style.display="none";return;}if(!M)return;AVG=await api("/avgbeat");d.style.display="block";drawAvg();};
+function drawAvg(){const c=$("avgcv"),g=c.getContext("2d"),dpr=window.devicePixelRatio||1;const W=c.clientWidth,H=c.clientHeight;c.width=W*dpr;c.height=H*dpr;g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,W,H);
+ if(!AVG||!AVG.morphs.length){g.fillStyle="#e7eaf0";g.fillText("no beats",20,20);return;}
+ const nl=AVG.morphs[0].y.length,padL=50,padT=30+14*AVG.morphs.length,padB=26,laneH=(H-padT-padB)/nl,t=AVG.t,tmin=t[0],tmax=t[t.length-1];const xOf=ms=>padL+(ms-tmin)/(tmax-tmin)*(W-padL-15);
+ g.font="11px system-ui";g.fillStyle="#e7eaf0";g.fillText("Median beat per QRS morphology (15 Hz low-pass), all leads; the QRS is clipped so the T wave fills the scale. Green: T peak (o) and T end (|). Dashed blue: median P wave.",12,16);
+ for(let li=0;li<nl;li++){const yTop=padT+li*laneH,yMid=yTop+laneH*0.55;let sc=0;AVG.morphs.forEach(m=>m.y[li].forEach((v,i)=>{if(t[i]>80||t[i]<-60)sc=Math.max(sc,Math.abs(v));}));sc=Math.max(sc*1.3,0.01);const k=(laneH*0.42)/sc;
+  g.strokeStyle="#262b36";g.beginPath();g.moveTo(padL,yMid);g.lineTo(W-15,yMid);g.stroke();for(let ms=-100;ms<=400;ms+=100){g.beginPath();g.moveTo(xOf(ms),yTop);g.lineTo(xOf(ms),yTop+laneH);g.stroke();if(li===nl-1){g.fillStyle="#9aa3b2";g.fillText(ms+" ms",xOf(ms)-12,H-8);}}
+  g.fillStyle="#9aa3b2";g.fillText("ECG "+(li+1),6,yTop+12);
+  // zoomed scale: show 20 µV bar
+  g.strokeStyle="#9aa3b2";g.beginPath();g.moveTo(padL-6,yMid);g.lineTo(padL-6,yMid-0.02*k);g.stroke();g.fillText("20 µV",4,yMid-0.02*k-3);
+  AVG.morphs.forEach(m=>{const col=MORPH[m.morph%MORPH.length];g.strokeStyle=col;g.lineWidth=1.4;g.beginPath();m.y[li].forEach((v,i)=>{const x=xOf(t[i]),y=yMid-Math.max(-sc*1.2,Math.min(sc*1.2,v))*k;i?g.lineTo(x,y):g.moveTo(x,y);});g.stroke();g.lineWidth=1;
+   if(m.tpeak_ms!=null){const i=t.findIndex(v=>v>=m.tpeak_ms);g.strokeStyle="#2ecc71";g.beginPath();g.arc(xOf(m.tpeak_ms),yMid-m.y[li][i]*k,5,0,7);g.stroke();}
+   if(m.tend_ms!=null){g.strokeStyle="#2ecc71";g.lineWidth=2;g.beginPath();g.moveTo(xOf(m.tend_ms),yMid-12);g.lineTo(xOf(m.tend_ms),yMid+12);g.stroke();g.lineWidth=1;}});
+  if(AVG.p){g.strokeStyle="#46c3ff";g.setLineDash([4,3]);g.beginPath();AVG.p.y[li].forEach((v,i)=>{const x=xOf(AVG.p.t[i]),y=yMid-v*k;i?g.lineTo(x,y):g.moveTo(x,y);});g.stroke();g.setLineDash([]);}}
+ // legend
+ let y0=30;AVG.morphs.forEach(m=>{g.fillStyle=MORPH[m.morph%MORPH.length];g.fillRect(60,y0-8,10,10);g.fillStyle="#e7eaf0";
+  g.fillText(`morphology ${m.morph}: n=${m.n}` + (m.t_ok?`, T amp ${Math.round(m.t_amp_uv)} µV, T peak ${Math.round(m.tpeak_ms)} ms, QT ${Math.round(m.tend_ms)} ms (measured on ${Math.round(m.frac_measured*100)} % of beats)`:`, T too small to measure (${m.t_amp_uv!=null?Math.round(m.t_amp_uv)+" µV":"n/a"})`),76,y0);y0+=14;});}
+cv.addEventListener("mousemove",e=>{if(!M||!SEG)return;const L=layout();const t=t0+(e.clientX-cv.getBoundingClientRect().left-L.padL)/L.plotW*winSec;hoverT=t;
+ const n=nearest(t);let s=`t = ${fmt(t)} (${clock(t)})`;if(n){const o=n.type==="qrs"?QRS[n.i]:P[n.i];s+=n.type==="qrs"?` · QRS morph ${o.morph} conf ${o.conf} ${o.src}`:` · P ${o.src}`;}
+ if(mode)s+=` · mode: ${ {q:"add QRS",p:"add P",d:"delete",x:"toggle"}[mode]}: click`;$("hover").textContent=s;draw();});
+cv.addEventListener("mouseleave",()=>{hoverT=null;draw();});
+cv.addEventListener("click",e=>{if(!M||!SEG)return;const L=layout();const t=t0+(e.clientX-cv.getBoundingClientRect().left-L.padL)/L.plotW*winSec;
+ if(mode==="q")addQRS(t);else if(mode==="p")addP(t);else if(mode==="d")del(t);else if(mode==="x")toggle(t);else return;draw();});
+cv.addEventListener("contextmenu",e=>{e.preventDefault();if(!M)return;const L=layout();const t=t0+(e.clientX-cv.getBoundingClientRect().left-L.padL)/L.plotW*winSec;del(t);draw();});
+window.addEventListener("keydown",e=>{if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT")return;if(!M)return;const k=e.key.toLowerCase();
+ if(e.key==="ArrowRight")go(t0+(e.shiftKey?winSec:winSec/2));else if(e.key==="ArrowLeft")go(t0-(e.shiftKey?winSec:winSec/2));
+ else if(k==="q")setMode("q");else if(k==="p")setMode("p");else if(k==="d")setMode("d");else if(k==="x")setMode("x");else if(k==="z")undo();
+ else if(k==="r"){markReviewed(true);}else if(k==="u")markReviewed(false);else if(k==="s"){e.preventDefault();save();}else if(e.key==="Escape")setMode(null);
+ else if(e.key==="+"||e.key==="="){const o=[4,8,15,30,60],i=o.indexOf(winSec);if(i>0){$("win").value=o[i-1];$("win").onchange();}}
+ else if(e.key==="-"){const o=[4,8,15,30,60],i=o.indexOf(winSec);if(i<o.length-1){$("win").value=o[i+1];$("win").onchange();}}
+ else if(k==="n")$("next-low").click();});
+window.addEventListener("beforeunload",e=>{if(dirty){e.preventDefault();e.returnValue="";}});
+loadFiles().then(()=>fitCanvas());fitCanvas();setTimeout(fitCanvas,500);
+</script></body></html>

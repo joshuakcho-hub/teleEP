@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data and results: never commit recordings
+*.edf
+*.EDF
+*.PnmWav
+*.PnmExp
+*.PnmMarks
+*.PnmResults
+*.PnmExpLog
+teleep_results/
+pigecg_results/
+annotations/

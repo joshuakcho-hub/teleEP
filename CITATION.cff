@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "TeleEP: open-source analysis of implantable telemetry ECG"
+abstract: >-
+  TeleEP converts DSI Ponemah telemetry recordings to EDF+, filters them, detects QRS complexes and
+  P waves (including in atrioventricular block), and computes RR and PP interval series and heart rate
+  variability, with CSV, Excel and JSON export and an interactive browser-based viewer.
+type: software
+authors:
+  - given-names: Joshua Kyungjoon
+    family-names: Cho
+  - given-names: Hee Cheol
+    family-names: Cho
+    affiliation: "Johns Hopkins University School of Medicine"
+version: 1.0.0
+date-released: "2026-10-30"
+license: BSD-3-Clause
+keywords:
+  - ECG
+  - telemetry
+  - heart rate variability
+  - EDF
+  - atrioventricular block
+  - sinus node dysfunction
